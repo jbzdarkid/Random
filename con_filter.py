@@ -8,18 +8,18 @@ Server reservation check 0x*** will not queue connect
 Server reservation2 is awaiting *
 SetConVar: *** = "0"
 Votes: Option1 - *, Option2 - *, Option3 - 0, Option4 - 0, Option5 - 0
-PopulateLevelInfo: de_dust2 classic casual
+PopulateLevelInfo: de_*** *** ***
 '''
 
 notwant = '''
 -------------------------
-  Attempted to attach particle effect weapon_muzzle_flash_assaultrifle_fallback to an unknown attachment on entity predicted_viewmodel
+  Attempted to attach particle effect weapon_muzzle_flash_***_fallback to an unknown attachment on entity predicted_viewmodel
   Avatar image for user *** cached [refcount=1]
   Avatar image for user *** released [refcount=1]
   CScaleformComponent_ImageCache evicting avatar ***
   Damage Taken from "***" - ** in * hits
   Restarting sound playback
-  Shutdown 2 predictable entities and 0 client-created entities
+  Shutdown * predictable entities and 0 client-created entities
   Unknown command: -pref_lookataweapon
 Bad sequence in GetSequenceName() for model \'weapons\\***.mdl\'!
 Inventory image for item *** released [refcount=0]
