@@ -1,16 +1,17 @@
 from json import loads
+from random import randint
 from re import search
 from threading import Lock, Thread
+from time import sleep
 from urllib import urlretrieve
 from urllib2 import urlopen
-from random import randint
 
 # Credit to Vinko Vrsalovic on http://stackoverflow.com/questions/295135/turn-a-string-into-a-valid-filename-in-python
 import string
 valid_chars = "-_.() %s%s" % (string.ascii_letters, string.digits)
 
 lock = Lock()
-data = urlopen("http://schafferthedarklord.bandcamp.com/album/sick-passenger").read()
+data = urlopen("http://schafferthedarklord.bandcamp.com/album/manslaughterer").read()
 m = search('trackinfo :(.*),', data)
 dict = loads(m.group(1))
 numTracks = len(dict)
@@ -51,5 +52,4 @@ for i in order:
 		'i': i})
 	threads[i] = thread
 	thread.start()
-
-# Validate file size?
+	sleep(0.1)
