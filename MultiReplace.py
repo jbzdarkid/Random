@@ -1,5 +1,7 @@
 # coding=utf-8
 
+#Credit vegaseat on Daniweb: https://www.daniweb.com/software-development/python/code/216636/multiple-word-replace-in-text-python
+
 import re
 
 def multiwordReplace(text, wordDic):
