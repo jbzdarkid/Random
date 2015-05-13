@@ -8,6 +8,7 @@ Votes: Option1 - *, Option2 - *, Option3 - 0, Option4 - 0, Option5 - 0
 
 hit = '''
 Confirmation number *** for *** (**/*) (* tokens)
+Matchmaking abandon notification: */***.**.***.**:27***/***
 map de_***
 *** connected.
 SetConVar: *** = "*"
@@ -54,29 +55,25 @@ def t(char1):
 	if char1 == '*':
 		return
 	for char2 in search:
+		for line in must_hit:
+			line += '*'
+			state = 0
+			for i in range(len(line)-1):
+				if state%2 == 0:
+					if char1 == line[i].lower():
+						if char2 == '*' or char2 == line[i+1].lower():
+								state += 1
+			breakOut = False
+			if state != 1:
+				breakOut = True
+				break
+		if breakOut:
+			continue
+		
 		for char3 in search:
 			if char3 == '*':
 				continue
 			for char4 in search:
-				for line in must_hit:
-					line += '*'
-					state = 0
-					for i in range(len(line)-1):
-						if state%2 == 0:
-							if char1 == line[i].lower():
-								if char2 == '*' or char2 == line[i+1].lower():
-										state += 1
-						if state/2 == 0:
-							if char3 == line[i].lower():
-								if char4 == line[i+1].lower():
-									state += 2
-					breakOut = False
-					if state != 1:
-						breakOut = True
-						break
-				if breakOut:
-					break
-
 				for line in must_miss:
 					line += '*'
 					state = 0
@@ -87,7 +84,7 @@ def t(char1):
 										state += 1
 						if state/2 == 0:
 							if char3 == line[i].lower():
-								if char4 == line[i+1].lower():
+								if char4 == '*' or char4 == line[i+1].lower():
 									state += 2
 					breakOut = False
 					if state == 1:
@@ -107,7 +104,7 @@ def t(char1):
 									state += 1
 						if state/2 == 0:
 							if char3 == line[i].lower():
-								if char4 == line[i].lower():
+								if char4 == '*' or char4 == line[i].lower():
 									state += 2
 					if state == 1:
 						score += 3
@@ -124,20 +121,20 @@ def t(char1):
 									state += 1
 						if state/2 == 0:
 							if char3 == line[i].lower():
-								if char4 == line[i+1].lower():
+								if char4 == '*' or char4 == line[i+1].lower():
 									state += 2
 					if state < 2:
-						score -= 1
-				
-				if breakOut:
-					break
+						score -= 2
 				
 				if score >= 0:
 					lock.acquire()
 					settings = 'con_filter_text "'+char1
 					if char2 != '*':
 						settings += char2
-					settings += '"; con_filter_text_out "'+char3+char4+'"'
+					settings += '"; con_filter_text_out "'+char3
+					if char4 != '*':
+						settings += char4
+					settings += '"'
 					output.append([score, settings])
 					lock.release()
 
