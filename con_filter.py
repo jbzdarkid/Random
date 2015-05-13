@@ -1,70 +1,156 @@
-want = '''
-[Cloud]: SUCCEESS retrieved cfg/config.cfg from remote storage into cfg/config.cfg
-[Cloud]: SUCCEESS saving cfg/config.cfg in remote storage
+from time import sleep
+from threading import Lock, Thread
+
+must_hit = '''
 Damage Given to "***" - ** in * hits
-Global search time avg:   ***
-Host_WriteConfiguration: Wrote cfg/config.cfg
-Server reservation check 0x*** will not queue connect
-Server reservation2 is awaiting *
-SetConVar: *** = "0"
 Votes: Option1 - *, Option2 - *, Option3 - 0, Option4 - 0, Option5 - 0
-PopulateLevelInfo: de_*** *** ***
-'''
+'''.split('\n')[1:-1]
 
-notwant = '''
+hit = '''
+Confirmation number *** for *** (**/*) (* tokens)
+map de_***
+*** connected.
+SetConVar: *** = "*"
+'''.split('\n')[1:-1]
+
+must_miss = '''
+Avatar image for user *** cached [refcount=*]
+CScaleformComponent_ImageCache evicting avatar ***
+Avatar image for user *** released [refcount=*]
+Bad sequence in GetSequenceName() for model \'weapons\\v_***.mdl\'!
+'''.split('\n')[1:-1]
+
+miss = '''
+Unknown command: ***
+Player: *** - Damage Given
+Player: *** - Damage Taken
 -------------------------
-  Attempted to attach particle effect weapon_muzzle_flash_***_fallback to an unknown attachment on entity predicted_viewmodel
-  Avatar image for user *** cached [refcount=1]
-  Avatar image for user *** released [refcount=1]
-  CScaleformComponent_ImageCache evicting avatar ***
-  Damage Taken from "***" - ** in * hits
-  Restarting sound playback
-  Shutdown * predictable entities and 0 client-created entities
-  Unknown command: -pref_lookataweapon
-Bad sequence in GetSequenceName() for model \'weapons\\***.mdl\'!
-Inventory image for item *** released [refcount=0]
-'''
+0: Reinitialized * predictable entities and * client-created entities
+Shutdown * predictable entities and 0 client-created entities
+'''.split('\n')[1:-1]
 
-chars = {}
-for line in want.split('\n'):
-	line_chars = set(line)
-	for char in line_chars:
-		if char not in chars:
-			chars[char] = 0
-		chars[char] += 1
 
-ordered_chars = []
-for k, v in zip(chars.keys(), chars.values()):
-	ordered_chars.append([v, k])
-ordered_chars.sort()
-for [k, v] in ordered_chars:
-	print v, k
+search = ''
+for line in hit+miss+must_hit+must_miss:
+	for char in line:
+		if char.lower() not in search:
+			search += char.lower()
+search += ''
+print search
 
-raw_input()
-pairs = {}
-for line in want.split('\n'):
-	line_pairs = set()
-	for i in range(len(line)-1):
-		pair = line[i]+line[i+1]
-		line_pairs.add(pair)
-	for pair in line_pairs:
-		if pair not in pairs:
-			pairs[pair] = 0
-		pairs[pair] += 1
+output = []
+threads = []
+lock = Lock()
 
-for line in notwant.split('\n'):
-	line_pairs = set()
-	for i in range(len(line)-1):
-		pair = line[i]+line[i+1]
-		line_pairs.add(pair)
-	for pair in line_pairs:
-		if pair not in pairs:
-			pairs[pair] = 0
-		pairs[pair] -= 1
+def t(char1):
+	# State 0: Appears in console but not on screen.
+	#		Matches neither
+	# State 1: Appears in console and on screen.
+	#		Matches filter
+	# State 2: Does not appear.
+	#		Matches filter out
+	# State 3: Does not appear.
+	#		Matches both
+	if char1 == '*':
+		return
+	for char2 in search:
+		for char3 in search:
+			if char3 == '*':
+				continue
+			for char4 in search:
+				for line in must_hit:
+					line += '*'
+					state = 0
+					for i in range(len(line)-1):
+						if state%2 == 0:
+							if char1 == line[i].lower():
+								if char2 == '*' or char2 == line[i+1].lower():
+										state += 1
+						if state/2 == 0:
+							if char3 == line[i].lower():
+								if char4 == line[i+1].lower():
+									state += 2
+					breakOut = False
+					if state != 1:
+						breakOut = True
+						break
+				if breakOut:
+					break
 
-ordered_pairs = []
-for k, v in zip(pairs.keys(), pairs.values()):
-	ordered_pairs.append([v, k])
-ordered_pairs.sort()
-for [k, v] in ordered_pairs:
-	print k, v
+				for line in must_miss:
+					line += '*'
+					state = 0
+					for i in range(len(line)-1):
+						if state%2 == 0:
+							if char1 == line[i].lower():
+								if char2 == '*' or char2 == line[i+1].lower():
+										state += 1
+						if state/2 == 0:
+							if char3 == line[i].lower():
+								if char4 == line[i+1].lower():
+									state += 2
+					breakOut = False
+					if state == 1:
+						breakOut = True
+						break
+				if breakOut:
+					continue
+				
+				score = 0
+				for line in hit:
+					line += '*'
+					state = 0
+					for i in range(len(line)-1):
+						if state%2 == 0:
+							if char1 == line[i].lower():
+								if char2 == '*' or char2 == line[i+1].lower():
+									state += 1
+						if state/2 == 0:
+							if char3 == line[i].lower():
+								if char4 == line[i].lower():
+									state += 2
+					if state == 1:
+						score += 3
+					if state == 0:
+						score += 1
+				
+				for line in miss:
+					line += '*'
+					state = 0
+					for i in range(len(line)-1):
+						if state%2 == 0:
+							if char1 == line[i].lower():
+								if char2 == '*' or char2 == line[i+1].lower():
+									state += 1
+						if state/2 == 0:
+							if char3 == line[i].lower():
+								if char4 == line[i+1].lower():
+									state += 2
+					if state < 2:
+						score -= 1
+				
+				if breakOut:
+					break
+				
+				if score >= 0:
+					lock.acquire()
+					settings = 'con_filter_text "'+char1
+					if char2 != '*':
+						settings += char2
+					settings += '"; con_filter_text_out "'+char3+char4+'"'
+					output.append([score, settings])
+					lock.release()
+
+
+for char1 in search:
+	thread = Thread(target=t, kwargs={'char1':char1})
+	threads.append(thread)
+	thread.start()
+	sleep(0.1)
+
+for thread in threads:
+	thread.join()
+
+for o in sorted(output):
+	print o[0], o[1]
+print len(output), 'valid options'
