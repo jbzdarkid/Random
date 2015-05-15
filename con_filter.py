@@ -1,4 +1,3 @@
-from time import sleep
 from threading import Lock, Thread
 
 must_hit = '''
@@ -7,147 +6,94 @@ Votes: Option1 - *, Option2 - *, Option3 - 0, Option4 - 0, Option5 - 0
 '''.split('\n')[1:-1]
 
 hit = '''
-Confirmation number *** for *** (**/*) (* tokens)
-Matchmaking abandon notification: */***.**.***.**:27***/***
-map de_***
 *** connected.
+Confirmation number *** for *** (**/*) (* tokens)
+Damage Taken from "World" - ** in 1 hit
+Host_newgame on de_***
+Lobby data: game:map = de_***
+map de_***
+Matchmaking abandon notification: */***.**.***.**:27***/***
+PopulateLevelInfo: de_*** classic ***
 SetConVar: *** = "*"
 '''.split('\n')[1:-1]
 
 must_miss = '''
 Avatar image for user *** cached [refcount=*]
-CScaleformComponent_ImageCache evicting avatar ***
 Avatar image for user *** released [refcount=*]
 Bad sequence in GetSequenceName() for model \'weapons\\v_***.mdl\'!
+CScaleformComponent_ImageCache evicting avatar ***
 '''.split('\n')[1:-1]
 
 miss = '''
-Unknown command: ***
-Player: *** - Damage Given
-Player: *** - Damage Taken
 -------------------------
 0: Reinitialized * predictable entities and * client-created entities
+Notification CDN download result: ok (code: 200, size: 2)...
+Player: *** - Damage Taken
 Shutdown * predictable entities and 0 client-created entities
+SignalXWriteOpportunity(*)
+Unknown command: ***
 '''.split('\n')[1:-1]
 
-
-search = ''
+search = set()
 for line in hit+miss+must_hit+must_miss:
-	for char in line:
-		if char.lower() not in search:
-			search += char.lower()
-search += ''
-print search
+	for i in range(len(line)):
+		for j in range(i-3, i):
+			substring = line[j:i].lower()
+			if substring.find('*')+1:
+				continue
+			if substring not in search:
+				search.add(substring)
 
 output = []
 threads = []
 lock = Lock()
 
-def t(char1):
-	# State 0: Appears in console but not on screen.
-	#		Matches neither
-	# State 1: Appears in console and on screen.
-	#		Matches filter
-	# State 2: Does not appear.
-	#		Matches filter out
-	# State 3: Does not appear.
-	#		Matches both
-	if char1 == '*':
-		return
-	for char2 in search:
+def test_line(filter, filter_out, line):
+	line = line.lower()
+	if line.find(filter_out)+1:
+		return 3 # Text is filtered out.
+	if line.find(filter)+1:
+		return 2 # Text is visible on-screen.
+	else:
+		return 1 # Text is visible in console.
+
+for filter in search:
+	for filter_out in search:
+		score = (len(filter)+len(filter_out))**1.5
+	
+		skip = False
 		for line in must_hit:
-			line += '*'
-			state = 0
-			for i in range(len(line)-1):
-				if state%2 == 0:
-					if char1 == line[i].lower():
-						if char2 == '*' or char2 == line[i+1].lower():
-								state += 1
-			breakOut = False
-			if state != 1:
-				breakOut = True
+			ret = test_line(filter, filter_out, line)
+			if ret == 1 or ret == 3:
+				skip = True
 				break
-		if breakOut:
+		if skip:
 			continue
-		
-		for char3 in search:
-			if char3 == '*':
-				continue
-			for char4 in search:
-				for line in must_miss:
-					line += '*'
-					state = 0
-					for i in range(len(line)-1):
-						if state%2 == 0:
-							if char1 == line[i].lower():
-								if char2 == '*' or char2 == line[i+1].lower():
-										state += 1
-						if state/2 == 0:
-							if char3 == line[i].lower():
-								if char4 == '*' or char4 == line[i+1].lower():
-									state += 2
-					breakOut = False
-					if state == 1:
-						breakOut = True
-						break
-				if breakOut:
-					continue
+		for line in must_miss:
+			ret = test_line(filter, filter_out, line)
+			if ret == 1:
+				score -= 3
+			if ret == 2:
+				skip = True
+				break
+		if skip:
+			continue
+		for line in hit:
+			ret = test_line(filter, filter_out, line)
+			if ret == 1:
+				score += 3
+			if ret == 2:
+				score += 6
+		for line in miss:
+			ret = test_line(filter, filter_out, line)
+			if ret == 1:
+				score -= 2
+			if ret == 2:
+				score -= 4
 				
-				score = 0
-				for line in hit:
-					line += '*'
-					state = 0
-					for i in range(len(line)-1):
-						if state%2 == 0:
-							if char1 == line[i].lower():
-								if char2 == '*' or char2 == line[i+1].lower():
-									state += 1
-						if state/2 == 0:
-							if char3 == line[i].lower():
-								if char4 == '*' or char4 == line[i].lower():
-									state += 2
-					if state == 1:
-						score += 3
-					if state == 0:
-						score += 1
-				
-				for line in miss:
-					line += '*'
-					state = 0
-					for i in range(len(line)-1):
-						if state%2 == 0:
-							if char1 == line[i].lower():
-								if char2 == '*' or char2 == line[i+1].lower():
-									state += 1
-						if state/2 == 0:
-							if char3 == line[i].lower():
-								if char4 == '*' or char4 == line[i+1].lower():
-									state += 2
-					if state < 2:
-						score -= 2
-				
-				if score >= 0:
-					lock.acquire()
-					settings = 'con_filter_text "'+char1
-					if char2 != '*':
-						settings += char2
-					settings += '"; con_filter_text_out "'+char3
-					if char4 != '*':
-						settings += char4
-					settings += '"'
-					output.append([score, settings])
-					lock.release()
-
-
-for char1 in search:
-	thread = Thread(target=t, kwargs={'char1':char1})
-	threads.append(thread)
-	thread.start()
-	sleep(0.1)
-
-for thread in threads:
-	thread.join()
+		if score > 0:
+			output.append([score, filter, filter_out])
 
 for o in sorted(output):
-	print o[0], o[1]
-print len(output), 'valid options'
+	print round(o[0], 1), 'con_filter_text "'+o[1]+'"; con_filter_text_out "'+o[2]+'"'
+print len(output), 'valid options of', len(search)**2, 'possibilities.'
