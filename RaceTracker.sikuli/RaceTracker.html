@@ -82,60 +82,70 @@
 </span><span class="cmt">#               - Scenario:
 </span><span class="cmt">#               - Runner A lists frame A. Runner B identifies frame A, but is in fact ahead of runner A.
 </span><span class="cmt">#               - Similary, Runner A identifies frame B, and is correctly behind.
-</span><span class="cmt">#               - Solution is probably to double-key (i.e. 2+ continuous frames) 
-</span><span class="cmt"># General idea is to create an array of frames (challenges) and for each thread/runner to have an associated list of times (responses)
-</span><span class="cmt"># Both of these should be read/write safe, using a semaphore...? Possibly threads will make local copies.
-</span><span class="cmt"># We're going need to do complete challenges to reconstruct order, rather than allowing only the leader to challenge.
-</span><span class="cmt"># 
+</span><span class="cmt">#               - Solution:
+</span><span class="cmt">#               Maintain a list of frames, captured every {30 sec}. For 1 minute, watch for frame 0 {0-60 sec delay}.
+</span><span class="cmt">#               For the next minute, watch for frame 1 {30-90 sec delay}. Etc, etc. Delays are calculated twice as slowly, but twice as accurately.
 </span>
 <span class="kw">from</span> time <span class="kw">import</span> time
-<span class="kw">from</span> threading <span class="kw">import</span> thread, lock
+<span class="kw">from</span> threading <span class="kw">import</span> Lock, Thread
+<span class="kw">import</span> sys
 
+Settings.WaitScanRate = <span class="dig">60</span> <span class="cmt"># 60 scans per sec, this is 20x faster than normal!</span>
 setThrowException(False) <span class="cmt"># If a match fails, returns None rather than raising exception FindFailed</span>
-challenges = []
-responses = [[]]
-challenge_lock = Lock() <span class="cmt"># Used when creating a challenge.</span>
-start_time = time()
-threshold = <span class="dig">5</span>*<span class="dig">60</span> <span class="cmt"># 5 minute threshold</span>
-threads = []
-keep_alive = True
-
-<span class="kw">def</span> create_challenge(region, index):
-        challenge_lock.acquire()
-        challenges.append(<span class="skw">capture</span>(region)) <span class="cmt"># Current frame</span>
-        time = time()
-        <span class="kw">for</span> i <span class="kw">in</span> range(len(responses)):
-                <span class="kw">if</span> i == index:
-                        r.append(time)
-                <span class="kw">else</span>:
-                        r.append(None)
-        challenge_lock.release()
-        <span class="kw">return</span> time
-
-<span class="kw">def</span> t(name, x, y, w, h, index):
-        responses.append([])
+ACCURACY = int(<span class="skw">input</span>(<span class="str">'Frequency of checkpoints (image captures), in seconds.\nSuggested is 30: '</span>))
+n = int(<span class="skw">input</span>(<span class="str">'Number of runners: '</span>))
+regions = [None]*n
+<span class="skw">popup</span>(<span class="str">'For each region, hover your mouse over a corner, press caps lock,\nmove to the other corner, and then release caps lock.'</span>)
+<span class="kw">for</span> region <span class="kw">in</span> regions
+        <span class="kw">while</span> (!Env.isLockOn(Key.CAPS_LOCK)):
+                <span class="skw">sleep</span>(<span class="dig">0.1</span>)
+        l1 = Env.getMouseLocation()
+        <span class="kw">while</span> (Env.isLockOn(Key.CAPS_LOCK)):
+                <span class="skw">sleep</span>(<span class="dig">0.1</span>)
+        l2 = Env.getMouseLocation()
+        x = l1.getX()
+        y = l1.getY()
+        <span class="kw">if</span> l2.getX() &lt; x:
+                x = l2.getX()
+                w = l1.getX()-x
+        <span class="kw">else</span>:
+                w = l2.getX()-x
+        <span class="kw">if</span> l2.getY() &lt; y:
+                y = l2.getY()
+                h = l1.getY()-y
+        <span class="kw">else</span>:
+                h = l2.getY()-y
         region = Region(x, y, w, h)
-        region.setAutoWaitTimeout(<span class="dig">1</span>) <span class="cmt"># Seconds</span>
-        last_response = create_challenge(region, index)
-        <span class="kw">while</span> keep_alive:
-                match = None
-                i = <span class="dig">0</span>
-                <span class="kw">while</span> (match <span class="kw">is</span> None <span class="kw">and</span> time()-last_response &lt; threshold*<span class="dig">2</span>):
-                        active_challenges = <span class="dig">0</span>
-                        <span class="kw">for</span> i <span class="kw">in</span> range(len(challenges)):
-                                <span class="kw">if</span> responses[index][i] <span class="kw">is</span> <span class="kw">not</span> None: <span class="cmt"># Challenge already completed</span>
-                                        <span class="kw">continue</span>
-                                active_challenges += <span class="dig">1</span>
-                                <span class="kw">if</span> active_challenges &gt; len(threads)*<span class="dig">2</span>: <span class="cmt"># Don't consider challenges that are too recent. ***Warning: Limits number of acceptable failures.</span>
-                                        <span class="kw">break</span>
-                                match = region.<span class="skw">wait</span>(challenges[i])
-                responses[index][i] = time() <span class="cmt"># Challenge completed</span>
-                <span class="kw">if</span> time() - last_response &gt; threshold:
-                        last_response = create_challenge(region, index)
+        region.highlight()
 
-<span class="cmt"># Get the regions
-</span><span class="cmt"># Start threads
-</span><span class="cmt"># On a timer(?) update a spaghetti graph.</span>
+<span class="kw">for</span> region <span class="kw">in</span> regions:
+        region.highlight() <span class="cmt"># De-highlight</span>
+
+challenges = [[] <span class="kw">for</span> _ <span class="kw">in</span> range(n)]
+responses = [[]]
+threads = [None]*n
+<span class="cmt"># Get regions w/ mouse clicks, highlight to confirm
+</span>start_time = time()
+
+<span class="kw">for</span> i <span class="kw">in</span> range(n):
+        threads[i] = Thread(target=watch, kwargs={<span class="str">'num'</span>:i})
+
+<span class="kw">while</span> (True): <span class="cmt"># This generates the comparison frames.</span>
+        <span class="kw">for</span> i <span class="kw">in</span> range(len(regions)):
+                <span class="cmt">#challenges[i].append(regions[i].capture())
+</span>                <span class="kw">print</span> <span class="str">''</span>
+        <span class="skw">sleep</span>(ACCURACY)
+
+<span class="kw">def</span> watch(num):
+        region = regions[num]
+        <span class="kw">while</span> (True):
+                c = <span class="dig">0</span>
+                match = None
+                <span class="kw">while</span> (match == None):
+                        challenge = challenges[c]
+                        match = region.<span class="skw">wait</span>(challenge, ACCURACY*<span class="dig">2</span>)
+                        c += <span class="dig">1</span>
+                responses[num][c-<span class="dig">1</span>] = time()
 </pre>
 </body>
 </html>
