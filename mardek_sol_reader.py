@@ -12,7 +12,7 @@ def to_hex(byte):
 
 signal = 'playtime\x08\x00\x00\x00\x03'
 
-for i in range(1):
+for i in range(70):
 	try:
 		f = open(save_file_dir+'MARDEKv3__sg_{:d}.sol'.format(i))
 		file = f.read()
