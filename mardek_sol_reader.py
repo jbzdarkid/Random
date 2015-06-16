@@ -20,8 +20,8 @@ for i in range(70):
 
 		for j in range(len(file)-len(signal)):
 			if file[j:j+len(signal)] == signal:
-				hex = ''.join(file[j+len(signal):j+len(signal)+36])
-				h, m, s = unpack('>4xd4xd4xd', hex)
+				time = ''.join(file[j+len(signal):j+len(signal)+36])
+				h, m, s = unpack('>4xd4xd4xd', time)
 				print 'Time for save file {:d}:\t{:02.0f}:{:02.0f}:{:02.0f}'.format(i+1,h,m,s)
 	except IOError:
 		continue
