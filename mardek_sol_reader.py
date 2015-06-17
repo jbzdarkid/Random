@@ -1,13 +1,18 @@
 from struct import unpack
 from os import walk, sep
+from os.path import expanduser
 
-shared_objects_dir = '/Users/joe/Library/Application Support/Google/Chrome/Default/Pepper Data/Shockwave Flash/WritableRoot/#SharedObjects'
+shared_objects_dirs = [
+	'Library/Application Support/Google/Chrome/Default/Pepper Data/Shockwave Flash/WritableRoot/#SharedObjects',
+	'Library/Preferences/Macromedia/Flash Player/#SharedObjects'
+]
 
 savefiles = []
-for root, dirs, files in walk(shared_objects_dir):
-	for filename in files:
-		if filename[:13] == 'MARDEKv3__sg_':
-			savefiles.append([root.split(sep)[-1], int(filename[13:-4]), root+sep+filename])
+for shared_objects_dir in shared_objects_dirs:
+	for root, dirs, files in walk(expanduser('~')+sep+shared_objects_dir):
+		for filename in files:
+			if filename[:13] == 'MARDEKv3__sg_':
+				savefiles.append([root.split(sep)[-1], int(filename[13:-4]), root+sep+filename])
 
 signal = 'playtime\x08\x00\x00\x00\x03' # 8 represents array, 0003 means 3 elements
 for file in sorted(savefiles):
