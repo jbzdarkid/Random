@@ -16,16 +16,15 @@
 
 from time import time
 from threading import Lock, Thread
-import sys
 
-Settings.WaitScanRate = 60 # 60 scans per sec, this is 20x faster than normal!
+Settings.WaitScanRate = 30 # 30 scans per sec, this is 10x faster than normal!
 setThrowException(False) # If a match fails, returns None rather than raising exception FindFailed
 ACCURACY = int(input('Frequency of checkpoints (image captures), in seconds.\nSuggested is 30: '))
 n = int(input('Number of runners: '))
-regions = [None]*n
+regions = []
 popup('For each region, hover your mouse over a corner, press caps lock,\nmove to the other corner, and then release caps lock.')
-for region in regions
-	while (!Env.isLockOn(Key.CAPS_LOCK)):
+for i in range(n):
+	while (not Env.isLockOn(Key.CAPS_LOCK)):
 		sleep(0.1)
 	l1 = Env.getMouseLocation()
 	while (Env.isLockOn(Key.CAPS_LOCK)):
@@ -45,24 +44,16 @@ for region in regions
 		h = l2.getY()-y
 	region = Region(x, y, w, h)
 	region.highlight()
-
+	regions.append(region)
+sleep(1)
 for region in regions:
 	region.highlight() # De-highlight
 
 challenges = [[] for _ in range(n)]
 responses = [[]]
-threads = [None]*n
+threads = []
 # Get regions w/ mouse clicks, highlight to confirm
 start_time = time()
-
-for i in range(n):
-	threads[i] = Thread(target=watch, kwargs={'num':i})
-
-while (True): # This generates the comparison frames.
-	for i in range(len(regions)):
-		#challenges[i].append(regions[i].capture())
-		print ''
-	sleep(ACCURACY)
 
 def watch(num):
 	region = regions[num]
@@ -74,3 +65,15 @@ def watch(num):
 			match = region.wait(challenge, ACCURACY*2)
 			c += 1
 		responses[num][c-1] = time()
+		# I'm not getting any matches.
+
+for i in range(n):
+	threads.append(Thread(target=watch, kwargs={'num':i}))
+
+for _ in range(10): # This generates the comparison frames.
+	for i in range(len(regions)):
+		challenges[i].append(Screen().capture(regions[i]))
+	sleep(ACCURACY)
+
+print challenges
+print responses
