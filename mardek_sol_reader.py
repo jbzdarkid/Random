@@ -18,11 +18,15 @@ signal = 'playtime\x08\x00\x00\x00\x03' # 8 represents array, 0003 means 3 eleme
 for file in sorted(savefiles):
 	try:
 		f = open(file[2]).read()
-
-		for j in range(len(f)-len(signal)):
-			if f[j:j+len(signal)] == signal:
-				hex = ''.join(f[j+len(signal):j+len(signal)+36])
-				h, m, s = unpack('>4xd4xd4xd', hex)
-				print 'Save file {:d} from {:s}:\t{:02.0f}:{:02.0f}:{:02.0f}'.format(file[1],file[0],h,m,s)
+		match = 0
+		for char in f:
+			if char != signal[match]:
+				match = 0
+			else:
+				match += 1
+				if match == len(signal)
+					time = ''.join(f[j+len(signal):j+len(signal)+36])
+					h, m, s = unpack('>4xd4xd4xd', time)
+					print 'Save file {:d} from {:s}:\t{:02.0f}:{:02.0f}:{:02.0f}'.format(file[1],file[0],h,m,s)
 	except IOError:
 		continue
