@@ -1,27 +1,23 @@
-from os import listdir, sep
 from struct import unpack
+from os import walk, sep
 
-save_file_dir = '/Users/joe/Library/Application Support/Google/Chrome/Default/Pepper Data/Shockwave Flash/WritableRoot/#SharedObjects/487NAFC7/localhost/'
+shared_objects_dir = '/Users/joe/Library/Application Support/Google/Chrome/Default/Pepper Data/Shockwave Flash/WritableRoot/#SharedObjects'
 
-def to_hex(byte):
-	byte = ord(byte)
-	digits = '0123456789ABCDEF'
-	p1 = byte/16
-	p2 = byte%16
-	return digits[p1] + digits[p2]
+savefiles = []
+for root, dirs, files in walk(shared_objects_dir):
+	for filename in files:
+		if filename[:13] == 'MARDEKv3__sg_':
+			savefiles.append([root.split(sep)[-1], int(filename[13:-4]), root+sep+filename])
 
-signal = 'playtime\x08\x00\x00\x00\x03'
-
-for i in range(70):
+signal = 'playtime\x08\x00\x00\x00\x03' # 8 represents array, 0003 means 3 elements
+for file in sorted(savefiles):
 	try:
-		f = open(save_file_dir+'MARDEKv3__sg_{:d}.sol'.format(i))
-		file = f.read()
-		f.close()
+		f = open(file[2]).read()
 
-		for j in range(len(file)-len(signal)):
-			if file[j:j+len(signal)] == signal:
-				hex = ''.join(file[j+len(signal):j+len(signal)+36])
+		for j in range(len(f)-len(signal)):
+			if f[j:j+len(signal)] == signal:
+				hex = ''.join(f[j+len(signal):j+len(signal)+36])
 				h, m, s = unpack('>4xd4xd4xd', hex)
-				print 'Time for save file {:d}:\t{:02.0f}:{:02.0f}:{:02.0f}'.format(i+1,h,m,s)
+				print 'Save file {:d} from {:s}:\t{:02.0f}:{:02.0f}:{:02.0f}'.format(file[1],file[0],h,m,s)
 	except IOError:
 		continue
