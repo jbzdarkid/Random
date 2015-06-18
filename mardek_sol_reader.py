@@ -19,13 +19,14 @@ for file in sorted(savefiles):
 	try:
 		f = open(file[2]).read()
 		match = 0
-		for char in f:
-			if char != signal[match]:
+		for i in range(len(f)-len(signal)):
+			if f[i] != signal[match]:
 				match = 0
 			else:
 				match += 1
-				if match == len(signal)
-					time = ''.join(f[j+len(signal):j+len(signal)+36])
+				if match == len(signal):
+					match = 0
+					time = ''.join(f[i+len(signal):i+len(signal)+36])
 					h, m, s = unpack('>4xd4xd4xd', time)
 					print 'Save file {:d} from {:s}:\t{:02.0f}:{:02.0f}:{:02.0f}'.format(file[1],file[0],h,m,s)
 	except IOError:
