@@ -87,14 +87,21 @@
 </span><span class="cmt">#               For the next minute, watch for frame 1 {30-90 sec delay}. Etc, etc. Delays are calculated twice as slowly, but twice as accurately.
 </span>
 <span class="kw">from</span> time <span class="kw">import</span> time
-<span class="kw">from</span> threading <span class="kw">import</span> Lock, Thread
+<span class="kw">from</span> threading <span class="kw">import</span> Thread
 
 Settings.WaitScanRate = <span class="dig">30</span> <span class="cmt"># 30 scans per sec, this is 10x faster than normal!</span>
 setThrowException(False) <span class="cmt"># If a match fails, returns None rather than raising exception FindFailed</span>
 ACCURACY = int(<span class="skw">input</span>(<span class="str">'Frequency of checkpoints (image captures), in seconds.\nSuggested is 30: '</span>))
-n = int(<span class="skw">input</span>(<span class="str">'Number of runners: '</span>))
+REDUNDANCY = <span class="dig">2</span> <span class="cmt"># Also effects timeliness of information. If a runner is 10 minutes behind, and this value is at 2,</span>
+<span class="cmt"># then this information will be discovered after 20 minutes.
+</span>n = int(<span class="skw">input</span>(<span class="str">'Number of runners: '</span>))
 regions = []
 <span class="skw">popup</span>(<span class="str">'For each region, hover your mouse over a corner, press caps lock,\nmove to the other corner, and then release caps lock.'</span>)
+App.focus(<span class="str">'Google Chrome'</span>)
+min_width = Screen().getW()
+min_height = Screen().getH()
+max_width = <span class="dig">0</span>
+max_height = <span class="dig">0</span>
 <span class="kw">for</span> i <span class="kw">in</span> range(n):
         <span class="kw">while</span> (<span class="kw">not</span> Env.isLockOn(Key.CAPS_LOCK)):
                 <span class="skw">sleep</span>(<span class="dig">0.1</span>)
@@ -114,12 +121,28 @@ regions = []
                 h = l1.getY()-y
         <span class="kw">else</span>:
                 h = l2.getY()-y
+        <span class="kw">if</span> min_width &gt; w:
+                min_width = w
+        <span class="kw">if</span> max_width &lt; w:
+                max_width = w
+        <span class="kw">if</span> min_height &gt; h:
+                min_height = h
+        <span class="kw">if</span> max_height &lt; h:
+                max_height = h
         region = Region(x, y, w, h)
-        region.highlight()
-        regions.append(region)
+        region.highlight() <span class="cmt"># Highlight</span>
+        regions.append([region])
 <span class="skw">sleep</span>(<span class="dig">1</span>)
-<span class="kw">for</span> region <span class="kw">in</span> regions:
-        region.highlight() <span class="cmt"># De-highlight</span>
+<span class="kw">for</span> i <span class="kw">in</span> range(n):
+        regions[i][<span class="dig">0</span>].highlight() <span class="cmt"># De-highlight</span>
+        error = <span class="dig">0</span>
+        <span class="kw">if</span> error &lt; max_width - regions[i][<span class="dig">0</span>].getW():
+                error = max_width - regions[i][<span class="dig">0</span>].getW()
+        <span class="kw">if</span> error &lt; max_height - regions[i][<span class="dig">0</span>].getH():
+                error = max_height - regions[i][<span class="dig">0</span>].getH()
+        regions[i].append(error)
+        regions[i][<span class="dig">0</span>].setW(min_width)
+        regions[i][<span class="dig">0</span>].setH(min_height)
 
 challenges = [[] <span class="kw">for</span> _ <span class="kw">in</span> range(n)]
 responses = [[]]
@@ -128,13 +151,13 @@ threads = []
 </span>start_time = time()
 
 <span class="kw">def</span> watch(num):
-        region = regions[num]
+        region = regions[num][<span class="dig">0</span>].nearby(regions[num][<span class="dig">1</span>])
         <span class="kw">while</span> (True):
                 c = <span class="dig">0</span>
                 match = None
                 <span class="kw">while</span> (match == None):
                         challenge = challenges[c]
-                        match = region.<span class="skw">wait</span>(challenge, ACCURACY*<span class="dig">2</span>)
+                        match = Screen().<span class="skw">wait</span>(challenge, ACCURACY*REDUNDANCY) <span class="cmt">#?</span>
                         c += <span class="dig">1</span>
                 responses[num][c-<span class="dig">1</span>] = time()
                 <span class="cmt"># I'm not getting any matches.
@@ -144,11 +167,13 @@ threads = []
 
 <span class="kw">for</span> _ <span class="kw">in</span> range(<span class="dig">10</span>): <span class="cmt"># This generates the comparison frames.</span>
         <span class="kw">for</span> i <span class="kw">in</span> range(len(regions)):
-                challenges[i].append(Screen().<span class="skw">capture</span>(regions[i]))
+                challenges[i].append(Screen().<span class="skw">capture</span>(regions[i][<span class="dig">0</span>]))
         <span class="skw">sleep</span>(ACCURACY)
 
-<span class="kw">print</span> challenges
-<span class="kw">print</span> responses
+<span class="kw">import</span> pprint
+pp = pprint.PrettyPrinter(indent=<span class="dig">2</span>)
+pp.pprint(challenges)
+pp.pprint(responses)
 </pre>
 </body>
 </html>
