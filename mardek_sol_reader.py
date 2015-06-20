@@ -25,9 +25,9 @@ for file in sorted(savefiles):
 			else:
 				match += 1
 				if match == len(signal):
-					match = 0
 					time = ''.join(f[i+len(signal):i+len(signal)+36])
 					h, m, s = unpack('>4xd4xd4xd', time)
 					print 'Save file {:d} from {:s}:\t{:02.0f}:{:02.0f}:{:02.0f}'.format(file[1],file[0],h,m,s)
+					raise IOError
 	except IOError:
 		continue
