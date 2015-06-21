@@ -1,16 +1,13 @@
-# Basic idea is:
-# Always scan H and W separately, i.e. consider as lines (1d > 2d)
-# 0. An array of pixels and scores (-x = static, 0 = average/confused, x = moving)
-# 1. Remove borders
-# 2. Attempt to break into regions as follows:
-#		a. For each line, require the next 5 (or so) lines to be excluded.
-#		b. If including the next line (and excluding line n+6) would improve or not change your score, iterate.
-#		c. When including the next line has lower score (presumably line n+6 has no additional cost), stop
-#		d. Region is through n, restart process from 1, unless region is empty.
-# 3. If larger range is broken into >1 region, pass regions into the alternate direction scan method.
-#	4. If not, pass into border-stripping method, and then save final region into a list.
-#	5. Stitch regions together (?)
+# How to generate?
+#		Take 10 screenshots.
+#		For each pixel, count how many screenshots are different (multiplicitively, i.e. all different = 45)
 
+# Deal with mush (i.e. possible matches)
+# Deal with missing corners
+
+from threading import Thread
+global MIN_VALIDITY
+MIN_VALIDITY = .2
 
 # Removes pixels which are "bad" from the edge. Note: Trimming twice may remove "good" pixels, since there is no real buffer to use as comparison
 def trim(xmin, xmax, ymin, ymax):
@@ -21,61 +18,158 @@ def trim(xmin, xmax, ymin, ymax):
 			v_line_scores[x-xmin] += regiondata[x][y]
 			h_line_scores[y-ymin] += regiondata[x][y]
 
-	# Unfortunately, the order of these loops matter, because this loop references xmin, which may be changed by the second loop.
+	# Unfortunately, the order of these loops matter, because the first loop references xmin, which may be changed by the second loop.
 	for x in range(xmax-1, xmin, -1):
-		if v_line_scores[-1] < v_line_scores[x-xmin]:
+		if MIN_VALIDITY * len(v_line_scores) < v_line_scores[x-xmin]:
 			xmax = x+1
 			break
-
 	for x in range(xmin, xmax):
-		if v_line_scores[0] < v_line_scores[x-xmin]:
+		if MIN_VALIDITY * len(v_line_scores) < v_line_scores[x-xmin]:
 			xmin = x
 			break
 
 	for y in range(ymax-1, ymin, -1):
-		if h_line_scores[-1] < h_line_scores[y-ymin]:
+		if MIN_VALIDITY * len(h_line_scores) < h_line_scores[y-ymin]:
 			ymax = y+1
 			break
-	
 	for y in range(ymin, ymax):
-		if h_line_scores[0] < h_line_scores[y-ymin]:
+		if MIN_VALIDITY * len(h_line_scores) < h_line_scores[y-ymin]:
 			ymin = y
 			break
 	
 	return (xmin, xmax, ymin, ymax)
 
+global regions
+regions = []
+
+# Attempts to split the given region along vertical lines.
+def h_split(xmin, xmax, ymin, ymax):
+	xmin, xmax, ymin, ymax = trim(xmin, xmax, ymin, ymax)
+	h_line_scores = [0]*(xmax-xmin)
+	for x in range(xmin, xmax):
+		for y in range(ymin, ymax):
+			h_line_scores[x-xmin] += regiondata[x][y]
+	splits = []
+	for x in range(xmin, xmax-1):
+		if (1-MIN_VALIDITY) * h_line_scores[x-xmin] > h_line_scores[x-xmin+1]: # Appears to be the last line in a block
+			splits.append(x+1)
+	splits = [xmin] + splits + [xmax]
+	regions = []
+	threads = []
+	for i in range(len(splits)-1):
+		regions += v_split(splits[i], splits[i+1], ymin, ymax)
+		thread = Thread(target=v_split, kwargs={
+		'xmin': splits[i],
+		'xmax': splits[i+1],
+		'ymin': ymin,
+		'ymax': ymax})
+		thread.start()
+		threads.append(thread)
+	for thread in threads:
+		thread.join()
+	return regions
+
+# Attempts to split the given region along horizontal lines.
+def v_split(xmin, xmax, ymin, ymax):
+	xmin, xmax, ymin, ymax = trim(xmin, xmax, ymin, ymax)
+	v_line_scores = [0]*(ymax-ymin)
+	for x in range(xmin, xmax):
+		for y in range(ymin, ymax):
+			v_line_scores[y-ymin] += regiondata[x][y]
+	splits = []
+	for y in range(ymin, ymax-1):
+		if (1-MIN_VALIDITY) * v_line_scores[y-ymin] > v_line_scores[y-ymin+1]: # Appears to be the last line in a block
+			splits.append(y+1)
+	regions = []
+	if len(splits) > 0: # If we split into >1 part, then recurse. Otherwise, terminate.
+		splits = [ymin] + splits + [ymax]
+		threads = []
+		for i in range(len(splits)-1):
+			regions += h_split(xmin, xmax, splits[i], splits[i+1])
+			thread = Thread(target=h_split, kwargs={
+			'xmin': xmin,
+			'xmax': xmax,
+			'ymin': splits[i],
+			'ymax': splits[i+1]})
+			thread.start()
+		for thread in threads:
+		 	thread.join()
+		return regions
+	else: # Region was already split vertically, if there are no horizontal splits, then it's finalized.
+		return [[xmin, xmax, ymin, ymax]]
+
+def merge(regions):
+	new_region = None
+	for i in range(len(regions)):
+		for j in range(i):
+			if (regions[i][0], regions[i][1]) == (regions[j][0], regions[j][1]):
+				# i[xmin]=j[xmin], i[xmax]=j[xmax]
+				if regions[i][3] == regions[j][2]:
+					# i[ymax] == j[ymin]
+					new_region = [regions[i][0], regions[i][1], regions[i][2], regions[j][3]]
+				elif regions[j][3] == regions[i][2]:
+					# j[ymax] == i[ymin]
+					new_region = [regions[i][0], regions[i][1], regions[j][2], regions[i][3]]
+			elif (regions[i][2], regions[i][3]) == (regions[j][2], regions[j][3]):
+				# i[ymin]=j[ymin], i[ymax]=j[ymax]
+				if regions[i][1] == regions[j][0]:
+					# i[xmax] == j[xmin]
+					new_region = [regions[i][0], regions[j][1], regions[i][2], regions[i][3]]
+				elif regions[j][1] == regions[i][0]:
+					# j[xmax] == i[xmin]
+					new_region = [regions[j][0], regions[i][1], regions[i][2], regions[i][3]]
+			if new_region != None:
+				regions.append(new_region)
+				regions.pop(i)
+				regions.pop(j)
+				return merge(regions)
+	return regions
+
+
 def debug(xmin, xmax, ymin, ymax):
 	for x in range(xmin, xmax):
-		print regiondata[x][ymin:ymax]
+		line = ''
+		for char in regiondata[x][ymin:ymax]:
+			line += str(char)
+		print line
 	print
 
 if __name__ == '__main__':
-	# This should be generated by taking screenshots and comparing pixels. Somehow...
+	# This should be generated by taking screenshots and comparing pixels, somehow...
 	global regiondata
 	regiondata = []
 	
 	for line in '''
-	00000000000000000000000000
-	00000000000000000000000000
-	00000000111100000000000000
-	00000000111100000000000000
-	00000000111100011110000000
-	00000000111100011110000000
-	00000000000000011110000000
-	00000000000000011110000000
-	00000000000000000000000000
-	00000000000000000000000000
-	00000000000000000000000000
+	0000000000000000000
+	0000000000000000000
+	0000000005555500000
+	0000000005555500000
+	0000000005555500000
+	0044444005555500000
+	0044444005555500000
+	0044444000000000000
+	0044444000000000000
+	0044444000066666600
+	0000000000066666600
+	0000000000066666600
+	0000777770066666600
+	0000777770066666600
+	0000777770000000000
+	0000777770000000000
+	0000777770000000000
+	0000000000000000000
 	'''.strip().split('\n'):
 		data = []
+		from random import random
 		for char in line.strip():
-			if char == '0':
-				data.append(-5)
-			elif char == '1':
-				data.append(5)
+			# if char == '0' and random()*20 < 1:
+			# 	char = '1'
+			data.append(int(char))
 		regiondata.append(data)
 	
 	xmin, xmax, ymin, ymax = (0, len(regiondata), 0, len(regiondata[0]))
 	debug(xmin, xmax, ymin, ymax)
-	xmin, xmax, ymin, ymax = trim(xmin, xmax, ymin, ymax)
-	debug(xmin, xmax, ymin, ymax)
+	regions = h_split(xmin, xmax, ymin, ymax)
+	regions = merge(regions)
+	for region in regions:
+		debug(region[0], region[1], region[2], region[3])
