@@ -88,14 +88,19 @@
 </span>
 <span class="kw">from</span> time <span class="kw">import</span> time
 <span class="kw">from</span> threading <span class="kw">import</span> Thread
+<span class="kw">from</span> config <span class="kw">import</span> config
 
-Settings.WaitScanRate = <span class="dig">30</span> <span class="cmt"># 30 scans per sec, this is 10x faster than normal!</span>
+Settings.WaitScanRate = config[<span class="str">'RaceTracker'</span>][<span class="str">'Scan Rate'</span>]
+<span class="dig">30</span> <span class="cmt"># 30 scans per sec, this is 10x faster than normal!</span>
 setThrowException(False) <span class="cmt"># If a match fails, returns None rather than raising exception FindFailed</span>
-ACCURACY = int(<span class="skw">input</span>(<span class="str">'Frequency of checkpoints (image captures), in seconds.\nSuggested is 30: '</span>))
-REDUNDANCY = <span class="dig">2</span> <span class="cmt"># Also effects timeliness of information. If a runner is 10 minutes behind, and this value is at 2,</span>
-<span class="cmt"># then this information will be discovered after 20 minutes.
-</span>n = int(<span class="skw">input</span>(<span class="str">'Number of runners: '</span>))
-regions = []
+n = int(<span class="skw">input</span>(<span class="str">'Number of runners: '</span>))
+regions = [None]*n
+positions = [None]*n
+<span class="kw">print</span> positions
+<span class="kw">for</span> i <span class="kw">in</span> range(n):
+        positions[i] = [i]
+overtakes = [<span class="dig">0</span>]*n
+
 <span class="skw">popup</span>(<span class="str">'For each region, hover your mouse over a corner, press caps lock,\nmove to the other corner, and then release caps lock.'</span>)
 App.focus(<span class="str">'Google Chrome'</span>)
 min_width = Screen().getW()
@@ -131,7 +136,7 @@ max_height = <span class="dig">0</span>
                 max_height = h
         region = Region(x, y, w, h)
         region.highlight() <span class="cmt"># Highlight</span>
-        regions.append([region])
+        regions[i] = [region]
 <span class="skw">sleep</span>(<span class="dig">1</span>)
 <span class="kw">for</span> i <span class="kw">in</span> range(n):
         regions[i][<span class="dig">0</span>].highlight() <span class="cmt"># De-highlight</span>
@@ -147,29 +152,48 @@ max_height = <span class="dig">0</span>
 challenges = [[] <span class="kw">for</span> _ <span class="kw">in</span> range(n)]
 responses = [[]]
 threads = []
-<span class="cmt"># Get regions w/ mouse clicks, highlight to confirm
-</span>start_time = time()
+start_time = time()
+
+<span class="cmt"># For a given match object, determine which racer it refers to.
+</span><span class="kw">def</span> get_racer_num(match):
+        midX = match.getX()+match.getW()/<span class="dig">2.0</span>
+        midY = match.getY()+match.getH()/<span class="dig">2.0</span>
+        <span class="kw">for</span> i <span class="kw">in</span> range(n):
+                <span class="kw">if</span> regions[i][<span class="dig">0</span>].getX() &lt; midX <span class="kw">and</span> regions[i][<span class="dig">0</span>].getX() + regions[i][<span class="dig">0</span>].getW() &gt; midX:
+                        <span class="kw">if</span> regions[i][<span class="dig">0</span>].getY() &lt; midY <span class="kw">and</span> regions[i][<span class="dig">0</span>].getY() + regions[i][<span class="dig">0</span>].getH() &gt; midY:
+                                <span class="kw">return</span> i <span class="cmt"># This assumes no overlapping regions.</span>
 
 <span class="kw">def</span> watch(num):
-        region = regions[num][<span class="dig">0</span>].nearby(regions[num][<span class="dig">1</span>])
         <span class="kw">while</span> (True):
                 c = <span class="dig">0</span>
                 match = None
                 <span class="kw">while</span> (match == None):
                         challenge = challenges[c]
-                        match = Screen().<span class="skw">wait</span>(challenge, ACCURACY*REDUNDANCY) <span class="cmt">#?</span>
+                        match = Screen().<span class="skw">wait</span>(challenge, config[<span class="str">'RaceTracker'</span>][<span class="str">'Accuracy'</span>]*config[<span class="str">'RaceTracker'</span>][<span class="str">'Redundancy'</span>]) <span class="cmt"># Add comment here.</span>
                         c += <span class="dig">1</span>
+                <span class="kw">print</span> match
+                found_num = get_racer_num(match)
+                <span class="kw">if</span> positions[found_num] - positions[num] == -<span class="dig">1</span>: <span class="cmt"># The player ahead of us</span>
+                        overtakes[num] += <span class="dig">1</span>
+                <span class="kw">elif</span> positions[found_num] - positions[num] == <span class="dig">1</span>: <span class="cmt"># The player behind us</span>
+                        overtakes[num+<span class="dig">1</span>] == <span class="dig">0</span>
+                <span class="kw">elif</span> positions[found_num] - positions[num] == <span class="dig">2</span>: <span class="cmt"># The player behind the player behind us</span>
+                        overtakes[num+<span class="dig">2</span>] += <span class="dig">1</span>
+
                 responses[num][c-<span class="dig">1</span>] = time()
-                <span class="cmt"># I'm not getting any matches.
-</span>
+
 <span class="kw">for</span> i <span class="kw">in</span> range(n):
         threads.append(Thread(target=watch, kwargs={<span class="str">'num'</span>:i}))
 
 <span class="kw">for</span> _ <span class="kw">in</span> range(<span class="dig">10</span>): <span class="cmt"># This generates the comparison frames.</span>
         <span class="kw">for</span> i <span class="kw">in</span> range(len(regions)):
                 challenges[i].append(Screen().<span class="skw">capture</span>(regions[i][<span class="dig">0</span>]))
-        <span class="skw">sleep</span>(ACCURACY)
+        <span class="skw">sleep</span>(config[<span class="str">'RaceTracker'</span>][<span class="str">'Accuracy'</span>])
 
+<span class="cmt"># This thread (main) is now going to generate the graphical output. The most straightforward way to do this is a spaghetti graph.
+</span><span class="cmt"># With only knowledge of the difference between runners, if there is no new data, assume linear.
+</span><span class="cmt"># Interpolation between should probably be linear.
+</span>
 <span class="kw">import</span> pprint
 pp = pprint.PrettyPrinter(indent=<span class="dig">2</span>)
 pp.pprint(challenges)

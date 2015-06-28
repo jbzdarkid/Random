@@ -16,14 +16,19 @@
 
 from time import time
 from threading import Thread
+from config import config
 
-Settings.WaitScanRate = 30 # 30 scans per sec, this is 10x faster than normal!
+Settings.WaitScanRate = config['RaceTracker']['Scan Rate']
+30 # 30 scans per sec, this is 10x faster than normal!
 setThrowException(False) # If a match fails, returns None rather than raising exception FindFailed
-ACCURACY = int(input('Frequency of checkpoints (image captures), in seconds.\nSuggested is 30: '))
-REDUNDANCY = 2 # Also effects timeliness of information. If a runner is 10 minutes behind, and this value is at 2,
-# then this information will be discovered after 20 minutes.
 n = int(input('Number of runners: '))
-regions = []
+regions = [None]*n
+positions = [None]*n
+print positions
+for i in range(n):
+	positions[i] = [i]
+overtakes = [0]*n
+
 popup('For each region, hover your mouse over a corner, press caps lock,\nmove to the other corner, and then release caps lock.')
 App.focus('Google Chrome')
 min_width = Screen().getW()
@@ -59,7 +64,7 @@ for i in range(n):
 		max_height = h
 	region = Region(x, y, w, h)
 	region.highlight() # Highlight
-	regions.append([region])
+	regions[i] = [region]
 sleep(1)
 for i in range(n):
 	regions[i][0].highlight() # De-highlight
@@ -75,20 +80,35 @@ for i in range(n):
 challenges = [[] for _ in range(n)]
 responses = [[]]
 threads = []
-# Get regions w/ mouse clicks, highlight to confirm
 start_time = time()
 
+# For a given match object, determine which racer it refers to.
+def get_racer_num(match):
+	midX = match.getX()+match.getW()/2.0
+	midY = match.getY()+match.getH()/2.0
+	for i in range(n):
+		if regions[i][0].getX() < midX and regions[i][0].getX() + regions[i][0].getW() > midX:
+			if regions[i][0].getY() < midY and regions[i][0].getY() + regions[i][0].getH() > midY:
+				return i # This assumes no overlapping regions.
+
 def watch(num):
-	region = regions[num][0].nearby(regions[num][1])
 	while (True):
 		c = 0
 		match = None
 		while (match == None):
 			challenge = challenges[c]
-			match = Screen().wait(challenge, ACCURACY*REDUNDANCY) #?
+			match = Screen().wait(challenge, config['RaceTracker']['Accuracy']*config['RaceTracker']['Redundancy']) # Add comment here.
 			c += 1
+		print match
+		found_num = get_racer_num(match)
+		if positions[found_num] - positions[num] == -1: # The player ahead of us
+			overtakes[num] += 1
+		elif positions[found_num] - positions[num] == 1: # The player behind us
+			overtakes[num+1] == 0
+		elif positions[found_num] - positions[num] == 2: # The player behind the player behind us
+			overtakes[num+2] += 1
+		
 		responses[num][c-1] = time()
-		# I'm not getting any matches.
 
 for i in range(n):
 	threads.append(Thread(target=watch, kwargs={'num':i}))
@@ -96,7 +116,11 @@ for i in range(n):
 for _ in range(10): # This generates the comparison frames.
 	for i in range(len(regions)):
 		challenges[i].append(Screen().capture(regions[i][0]))
-	sleep(ACCURACY)
+	sleep(config['RaceTracker']['Accuracy'])
+
+# This thread (main) is now going to generate the graphical output. The most straightforward way to do this is a spaghetti graph.
+# With only knowledge of the difference between runners, if there is no new data, assume linear.
+# Interpolation between should probably be linear.
 
 import pprint
 pp = pprint.PrettyPrinter(indent=2)
