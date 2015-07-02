@@ -4,7 +4,9 @@ from os.path import expanduser
 
 shared_objects_dirs = [
 	'Library/Application Support/Google/Chrome/Default/Pepper Data/Shockwave Flash/WritableRoot/#SharedObjects',
-	'Library/Preferences/Macromedia/Flash Player/#SharedObjects'
+	'Library/Preferences/Macromedia/Flash Player/#SharedObjects',
+	'AppData\Local\Google\Chrome',
+	'AppData\Macromedia\Flash Player\#SharedObjects',
 ]
 
 savefiles = []
@@ -25,7 +27,7 @@ for file in sorted(savefiles):
 			else:
 				match += 1
 				if match == len(signal):
-					time = ''.join(f[i+len(signal):i+len(signal)+36])
+					time = ''.join(f[i+1:i+37])
 					h, m, s = unpack('>4xd4xd4xd', time)
 					print 'Save file {:d} from {:s}:\t{:02.0f}:{:02.0f}:{:02.0f}'.format(file[1],file[0],h,m,s)
 					raise IOError
