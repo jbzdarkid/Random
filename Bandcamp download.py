@@ -11,7 +11,7 @@ import string
 valid_chars = "-_.() %s%s" % (string.ascii_letters, string.digits)
 
 lock = Lock()
-data = urlopen("http://schafferthedarklord.bandcamp.com/album/manslaughterer").read()
+data = urlopen("https://harrycallaghan.bandcamp.com/album/tier-3-soundtrack").read()
 m = search('trackinfo :(.*),', data)
 dict = loads(m.group(1))
 numTracks = len(dict)
@@ -53,3 +53,6 @@ for i in order:
 	threads[i] = thread
 	thread.start()
 	sleep(0.1)
+
+for thread in threads:
+	thread.join()
