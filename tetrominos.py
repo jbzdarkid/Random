@@ -165,13 +165,13 @@ class PartialSolution(threading.Thread):
     self.board |= 2 << (x*self.board_w + y)
   
   def printBoard(self):
-    board2 = [[None for _ in range(self.board_w)] for __ in range(self.board_h)]
+    board2 = [[-1 for _ in range(self.board_w)] for __ in range(self.board_h)]
     x = y = 0
     for pieceNum, rotation in self.steps:
       pieceName, initialRotation = pieces[pieceNum]
       offset, piece = tetrominos[(pieceName, (initialRotation+rotation) % 4)]
       for x, y in doubleIter(self.board_h, self.board_w):
-        if board2[x][y] == None:
+        if board2[x][y] == -1:
           break
       for i, j in doubleIter(len(piece), len(piece[0])):
         if piece[i][j] == 1:
@@ -179,7 +179,7 @@ class PartialSolution(threading.Thread):
     for line in board2:
       row = ' '
       for cell in line:
-        row += '0123456789ABCDEF'[cell]
+        row += ' 0123456789ABCDEF'[cell+1]
       print row
   
   def run(self):
@@ -216,21 +216,23 @@ class PartialSolution(threading.Thread):
             continue
           pieceName, initialRotation = self.pieces[pieceNum]
           offset, piece = tetrominos[(pieceName, (initialRotation+rotation) % 4)]
+          # Avoiding duplicates
           if (pieceName, (initialRotation+rotation) % 4) in self.attempted_pieces:
             continue
           self.attempted_pieces.append((pieceName, (initialRotation+rotation) % 4))
           if piece == 'Invalid': # For pieces like the O which cannot be rotated further
             continue
+          newSolution = self.clone()
           # T pieces have a kind of parity. Consider the board to be a checkerboard,
-          # then a T piece covers 3 black and 1 white square, whereas all other pieces
+          # then a T piece covers 3 black and 1 white squares, whereas all other pieces
           # cover 2 and 2. Thus, you must have an even number of T pieces AND
-          # exactly half must be placed on white and on black.
+          # exactly half must be placed on white and half on black.
           if pieceName == 'T':
             parity = self.getParity(self.x, self.y)
             if abs(self.parity) == self.parityLimit and parity * self.parity > 0:
-              continue
-            self.parity += parity
-          newSolution = self.clone()
+              continue # At parity limit and this placement only increases said limit
+            newSolution.parity += parity
+          
           invalidPlacement = False
           for i, j in doubleIter(len(piece), len(piece[0])):
             if piece[i][j] == 1:
@@ -239,14 +241,12 @@ class PartialSolution(threading.Thread):
                 invalidPlacement = True
                 break
               newSolution.setBoard(self.x+i, self.y+j-offset)
-          # Checking for 1x1 holes in the next row is inefficient, as it happens very rarely.
+          # Checking for 1x1 holes in the next row is inefficient, as it happens very rarely (1-2%).
           # if self.x < self.board_h:
           #   for j in range(1, self.board_w-1):
           #     if (self.getBoard(self.x+1, j-1), self.getBoard(self.x+1, j), self.getBoard(self.x+1, j+1)) == (True, False, True):
           #       if self.isInvalid(self.x+2, j):
           #           invalidPlacement = True
-          #           global count
-          #           count += 1
           #           break
           if invalidPlacement:
             continue
@@ -258,35 +258,30 @@ class PartialSolution(threading.Thread):
 
 challenges = {
   # 'Name': ['Pieces', Height, Width],
-  # 'Connector':  ['T0, T0, L1', 3, 4], # Tied (3)
-  # 'A':          ['I1, L1, J1, Z0', 4, 4], # Better (1)
-  # 'Cube':       ['T0, T0, L1, Z0', 4, 4], # Tied (4)
-  # 'Floor 1':    ['L1, Z0, L1, Z0', 4, 4], # Tied (4)
-  # 'Recorder':   ['T0, T0, J1, S0, Z0', 5, 4], # Better (3)
-  # 'Fan':        ['T0, T0, L1, S0, Z0', 5, 4], # Tied (4)
-  # 'B':          ['I1, T0, T0, L1, Z0', 5, 4], # Tied (5)
-  # 'C':          ['T0, T0, J1, J1, L1, Z0', 6, 4], # Better (2)
-  # 'Platform':   ['I1, S0, T0, T0, L1, Z0', 6, 4], # Tied (5)
-  # 'Test':       ['I0, J0, L0, O0, S0, S0, Z0', 7, 4], # (2)
-  # 'Test 2':     ['I0, J0, L0, O0, S0, T0, T0, Z0', 8, 4], # (4)
-  # 'Floor 6':    ['O0, S0, S0, S0, S0, L0, L0, L0, L0', 6, 6], # Tied (8)
-  # 'Floor 2':    ['O0, T0, T0, T0, T0, L1, L1, L1, L1', 6, 6], # Better (7)
-  # 'A star':     ['T0, T0, T0, T0, L1, J1, S0, S0, Z0, Z0', 5, 8], # Better (6)
-  # 'B star':     ['I1, I1, O0, T0, T0, T0, T0, L1, L1, J1', 5, 8], # Better (3)
-  # 'C star':     ['L1, J1, S0, Z0, T0, T0, I1, I1, O0, O0', 5, 8], # Better (2)
-  # 'Floor 3':    ['I1, I1, I1, I1, J1, J1, L1, L1, S0, Z0', 5, 8], # Better (3)
-  # 'Floor 4':    ['O0, O0, T0, T0, T0, T0, J1, L1, S0, S0, Z0, Z0', 8, 6], # Better (4)
+  'Connector':  ['T0, T0, L1', 3, 4], # Tied (3)
+  'A':          ['I1, L1, J1, Z0', 4, 4], # Better (1)
+  'Cube':       ['T0, T0, L1, Z0', 4, 4], # Tied (4)
+  'Floor 1':    ['L1, Z0, L1, Z0', 4, 4], # Tied (4)
+  'Recorder':   ['T0, T0, J1, S0, Z0', 5, 4], # Better (3)
+  'Fan':        ['T0, T0, L1, S0, Z0', 5, 4], # Tied (4)
+  'B':          ['I1, T0, T0, L1, Z0', 5, 4], # Tied (5)
+  'C':          ['T0, T0, J1, J1, L1, Z0', 6, 4], # Better (2)
+  'Platform':   ['I1, S0, T0, T0, L1, Z0', 6, 4], # Tied (5)
+  'Floor 6':    ['O0, S0, S0, S0, S0, L0, L0, L0, L0', 6, 6], # Tied (8)
+  'Floor 2':    ['O0, T0, T0, T0, T0, L1, L1, L1, L1', 6, 6], # Better (7)
+  'A star':     ['T0, T0, T0, T0, L1, J1, S0, S0, Z0, Z0', 5, 8], # Better (6)
+  'B star':     ['I1, I1, O0, T0, T0, T0, T0, L1, L1, J1', 5, 8], # Better (3)
+  'C star':     ['L1, J1, S0, Z0, T0, T0, I1, I1, O0, O0', 5, 8], # Better (2)
+  'Floor 3':    ['I1, I1, I1, I1, J1, J1, L1, L1, S0, Z0', 5, 8], # Better (3)
+  'Floor 4':    ['O0, O0, T0, T0, T0, T0, J1, L1, S0, S0, Z0, Z0', 8, 6], # Better (4)
   'Floor 5':    ['I1, I1, O0, O0, O0, O0, T0, T0, T0, T0, J1, L1, S0, Z0', 7, 8], # Better (4)
 }
 
 NUMTHREADS = 8
-MAXSOLNS = 1 # Set to -1 for all solutions. Set to 0 to calculate only cost.
+MAXSOLNS = -1 # Set to -1 for all solutions. Set to 0 to calculate only cost.
 import copy
 import Queue
 import time
-import array
-global count
-count = 0
 
 lock = threading.Lock()
 for title in challenges.keys():
@@ -316,12 +311,9 @@ for title in challenges.keys():
     thread.start()
   for thread in threads:
     thread.join()
-    print '\a',
-  print
   print 'Challenge "{name}" using pieces {pieces}'.format(name=title, pieces=pieces)
   print 'Took {time} seconds using {partials} partials.'.format(time=time.time()-startTime, partials = uuid)
-  print '{num} solution{s} at cost {cost}:'.format(num=len(solutions), s=('s' if len(solutions) != 1 else ''), cost=maxCost)
+  print 'Found {num} solution{s} with {cost} rotations:'.format(num=len(solutions), s=('s' if len(solutions) != 1 else ''), cost=maxCost)
   for solution in solutions:
     solution.printBoard()
     print
-print count
