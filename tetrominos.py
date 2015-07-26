@@ -120,21 +120,23 @@ def getUUID():
 class PartialSolution(threading.Thread):
   def __init__(self, root=None):
     if root != None:
-      self.board, self.pieces, self.x, self.y, self.uuid = root
+      self.board, self.pieces, self.steps, self.x, self.y, self.uuid = root
       return
     super(PartialSolution, self).__init__()
   
   def debug(self):
     print 'UUID:', self.uuid
     print 'Board:'
-    self.printBoard()
+    self.printBoard2()
     print 'Cost:', self.cost
     print 'Pieces:', self.pieces
+    print 'Steps:', self.steps
   
   def clone(self):
     return PartialSolution(root=(
       copy.deepcopy(self.board),
       list(self.pieces),
+      list(self.steps),
       self.x,
       self.y,
       self.uuid, # Will be changed later IF the new copy survives
@@ -160,6 +162,30 @@ class PartialSolution(threading.Thread):
       out += ']'
       print out
   
+  def printBoard2(self):
+    board2 = [[None for _ in range(self.boardW())] for __ in range(self.boardH())]
+    x = y = 0
+    for pieceNum, rotation in self.steps:
+      pieceName, initialRotation = pieces[pieceNum]
+      offset, piece = tetrominos[(pieceName, (initialRotation+rotation) % 4)]
+      for x, y in doubleIter(self.boardH(), self.boardW()):
+        if board2[x][y] == None:
+          break
+      for i, j in doubleIter(len(piece), len(piece[0])):
+        if piece[i][j] == 1:
+          board2[x+i][y+j-offset] = pieceNum
+    for line in board2:
+      row = ' '
+      for cell in line:
+        row += '0123456789ABCDEF'[cell]
+      print row
+  
+  def boardH(self):
+    return len(board)
+  
+  def boardW(self):
+    return len(board[0])
+  
   def run(self): # Possibly implement T-tetromino parity
     while True:
       try:
@@ -183,7 +209,7 @@ class PartialSolution(threading.Thread):
         continue
       
       # Locating the first available space
-      for self.x, self.y in doubleIter(len(board), len(board[0])):
+      for self.x, self.y in doubleIter(self.boardH(), self.boardW()):
         if self.getBoard(self.x, self.y) != -1:
           continue
         break
@@ -214,6 +240,7 @@ class PartialSolution(threading.Thread):
           # Check for 1-gaps on next row (and then coverings on the row below)
           newSolution.uuid = getUUID()
           newSolution.pieces[pieceNum] = None
+          newSolution.steps.append((pieceNum, rotation))
           q.put((self.cost + rotation, newSolution))
       q.task_done()
 
@@ -262,7 +289,7 @@ for title in challenges.keys():
   startTime = time.time()
   
   q = Queue.PriorityQueue()
-  q.put((0, PartialSolution(root=(board, list(pieces), 0, 0, 0))))
+  q.put((0, PartialSolution(root=(board, list(pieces), [], 0, 0, 0))))
   threads = []
   for i in range(NUMTHREADS):
     thread = PartialSolution()
