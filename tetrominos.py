@@ -127,15 +127,7 @@ class PartialSolution(threading.Thread):
   def debug(self):
     print 'UUID:', self.uuid
     print 'Board:'
-    for line in self.board:
-      out = '['
-      for val in line:
-        if val != -1:
-          out += ' '
-        out += str(val)
-        out += ' '
-      out += ']'
-      print out
+    self.printBoard()
     print 'Cost:', self.cost
     print 'Pieces:', self.pieces
   
@@ -152,7 +144,21 @@ class PartialSolution(threading.Thread):
     return x < 0 or y < 0 or x >= len(self.board) or y >= len(self.board[0])
   
   def getBoard(self, x, y):
-    return self.board[self.x][self.y]
+    return self.board[x][y]
+  
+  def setBoard(self, x, y, value):
+    self.board[x][y] = value
+    
+  def printBoard(self):
+    for line in self.board:
+      out = '['
+      for val in line:
+        if val != -1:
+          out += ' '
+        out += str(val)
+        out += ' '
+      out += ']'
+      print out
   
   def run(self): # Possibly implement T-tetromino parity
     while True:
@@ -199,10 +205,10 @@ class PartialSolution(threading.Thread):
                 invalidPlacement = True
                 break
               # Collision
-              if self.board[self.x+i][self.y+j-offset] != -1:
+              if self.getBoard(self.x+i, self.y+j-offset) != -1:
                 invalidPlacement = True
                 break
-              newSolution.board[self.x+i][self.y+j-offset] = pieceNum
+              newSolution.setBoard(self.x+i, self.y+j-offset, pieceNum)
           if invalidPlacement:
             continue
           # Check for 1-gaps on next row (and then coverings on the row below)
@@ -213,29 +219,29 @@ class PartialSolution(threading.Thread):
 
 challenges = {
   # 'Name': ['Pieces', Height, Width],
-  'Connector':  ['T0, T0, L1', 3, 4], # Tied (3)
-  'A':          ['I1, L1, J1, Z0', 4, 4], # Better (1)
-  'Cube':       ['T0, T0, L1, Z0', 4, 4], # Better? (4)
-  'Floor 1':    ['L1, Z0, L1, Z0', 4, 4], # Tied (4)
+  # 'Connector':  ['T0, T0, L1', 3, 4], # Tied (3)
+  # 'A':          ['I1, L1, J1, Z0', 4, 4], # Better (1)
+  # 'Cube':       ['T0, T0, L1, Z0', 4, 4], # Better? (4)
+  # 'Floor 1':    ['L1, Z0, L1, Z0', 4, 4], # Tied (4)
   'Recorder':   ['T0, T0, J1, S0, Z0', 5, 4], # ? (3)
-  'Fan':        ['T0, T0, L1, S0, Z0', 5, 4], # Tied (4)
-  'B':          ['I1, T0, T0, L1, Z0', 5, 4], # Tied (5)
-  'C':          ['T0, T0, J1, J1, L1, Z0', 6, 4], # Better (2)
-  'Platform':   ['I1, S0, T0, T0, L1, Z0', 6, 4], # Tied (5)
-  'Test':       ['I0, J0, L0, O0, S0, S0, Z0', 7, 4],
-  'Test 2':     ['I0, J0, L0, O0, S0, T0, T0, Z0', 8, 4],
-  'Floor 6':    ['O0, S0, S0, S0, S0, L0, L0, L0, L0', 6, 6], # Tied (8)
-  'Floor 2':    ['O0, T0, T0, T0, T0, L1, L1, L1, L1', 6, 6], # Better (7)
-  'A star':     ['T0, T0, T0, T0, L1, J1, S0, S0, Z0, Z0', 5, 8], # Better (6)
-  'B star':     ['I1, I1, O0, T0, T0, T0, T0, L1, L1, J1', 5, 8], # Better (3)
-  'C star':     ['L1, J1, S0, Z0, T0, T0, I1, I1, O0, O0', 5, 8], # Better (2)
-  'Floor 3':    ['I1, I1, I1, I1, J1, J1, L1, L1, S0, Z0', 5, 8], # Better (3)
-  'Floor 4':    ['O0, O0, T0, T0, T0, T0, J1, L1, S0, S0, Z0, Z0', 8, 6], # Better (4)
-  'Floor 5':    ['I1, I1, O0, O0, O0, O0, T0, T0, T0, T0, J1, L1, S0, Z0', 7, 8], # 10
+  # 'Fan':        ['T0, T0, L1, S0, Z0', 5, 4], # Tied (4)
+  # 'B':          ['I1, T0, T0, L1, Z0', 5, 4], # Tied (5)
+  # 'C':          ['T0, T0, J1, J1, L1, Z0', 6, 4], # Better (2)
+  # 'Platform':   ['I1, S0, T0, T0, L1, Z0', 6, 4], # Tied (5)
+  # 'Test':       ['I0, J0, L0, O0, S0, S0, Z0', 7, 4],
+  # 'Test 2':     ['I0, J0, L0, O0, S0, T0, T0, Z0', 8, 4],
+  # 'Floor 6':    ['O0, S0, S0, S0, S0, L0, L0, L0, L0', 6, 6], # Tied (8)
+  # 'Floor 2':    ['O0, T0, T0, T0, T0, L1, L1, L1, L1', 6, 6], # Better (7)
+  # 'A star':     ['T0, T0, T0, T0, L1, J1, S0, S0, Z0, Z0', 5, 8], # Better (6)
+  # 'B star':     ['I1, I1, O0, T0, T0, T0, T0, L1, L1, J1', 5, 8], # Better (3)
+  # 'C star':     ['L1, J1, S0, Z0, T0, T0, I1, I1, O0, O0', 5, 8], # Better (2)
+  # 'Floor 3':    ['I1, I1, I1, I1, J1, J1, L1, L1, S0, Z0', 5, 8], # Better (3)
+  # 'Floor 4':    ['O0, O0, T0, T0, T0, T0, J1, L1, S0, S0, Z0, Z0', 8, 6], # Better (4)
+  # 'Floor 5':    ['I1, I1, O0, O0, O0, O0, T0, T0, T0, T0, J1, L1, S0, Z0', 7, 8], # 10
 }
 
-NUMTHREADS = 16
-MAXSOLNS = 1 # Set to -1 for all solutions. Set to 0 to calculate only cost.
+NUMTHREADS = 8
+MAXSOLNS = -1 # Set to -1 for all solutions. Set to 0 to calculate only cost.
 import copy
 import Queue
 import time
@@ -265,11 +271,10 @@ for title in challenges.keys():
     thread.start()
   for thread in threads:
     thread.join()
-    print '\a'
+    print '\a',
+  print
   print 'Challenge "{name}" using pieces {pieces}'.format(name=title, pieces=pieces)
   print 'Took {time} seconds using {partials} partials.'.format(time=time.time()-startTime, partials = uuid)
   print '{num} solution{s} at cost {cost}:'.format(num=len(solutions), s=('s' if len(solutions) != 1 else ''), cost=maxCost)
   for solution in solutions:
-    for line in solution.board:
-      print line
-    print
+    solution.debug()
