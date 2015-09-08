@@ -8,10 +8,10 @@ from urllib2 import urlopen
 
 # Credit to Vinko Vrsalovic on http://stackoverflow.com/questions/295135/turn-a-string-into-a-valid-filename-in-python
 import string
-valid_chars = "-_.() %s%s" % (string.ascii_letters, string.digits)
+valid_chars = '-_.() %s%s' % (string.ascii_letters, string.digits)
 
 lock = Lock()
-data = urlopen("https://harrycallaghan.bandcamp.com/album/tier-3-soundtrack").read()
+data = urlopen('https://harrycallaghan.bandcamp.com/album/tier-3-soundtrack').read()
 m = search('trackinfo :(.*),', data)
 dict = loads(m.group(1))
 numTracks = len(dict)
