@@ -1,4 +1,5 @@
 *.txt
+*.mp3
 *.pyc
 *.class
 .DS_Store
