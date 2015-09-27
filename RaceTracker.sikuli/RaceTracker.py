@@ -1,3 +1,5 @@
+# Suggestion: When potential difference between runners is > 20% of the time (i.e. frame 0 at time 5, difference = 2), restart calc.
+#
 # Initially, I need to determine who is in the lead:
 #	- Get current screenshot from all racers
 #	- Watch every stream for every other stream's key
