@@ -106,9 +106,9 @@ def doubleIter(xmax, ymax):
     for y in range(ymax):
       yield (x, y)
 
-import threading
+from threading import Lock, Thread
 global uuidlock
-uuidlock = threading.Lock()
+uuidlock = Lock()
 def getUUID():
   global uuid
   uuidlock.acquire()
@@ -117,13 +117,13 @@ def getUUID():
   uuidlock.release()
   return newId
 
-class PartialSolution(threading.Thread):
+class PartialSolution(Thread):
   def __init__(self, root=None):
     if root != None:
       self.board, self.board_h, self.board_w, self.pieces, self.steps, self.parity, self.parityLimit, self.x, self.y, self.uuid = root
       return
     super(PartialSolution, self).__init__()
-  
+
   def debug(self):
     print 'UUID:', self.uuid
     print 'Board:'
@@ -131,7 +131,7 @@ class PartialSolution(threading.Thread):
     print 'Cost:', self.cost
     print 'Pieces:', self.pieces
     print 'Steps:', self.steps
-  
+
   def clone(self):
     return PartialSolution(root=(
       self.board,
@@ -145,25 +145,33 @@ class PartialSolution(threading.Thread):
       self.y,
       self.uuid, # Will be changed later IF the new copy survives
       ))
-  
+
   def isInvalid(self, x, y):
     if x < 0 or y < 0:
       return True
     if x >= self.board_h or y >= self.board_w:
       return True
     return self.getBoard(x, y)
-  
+
   def getParity(self, x, y):
     evenOdd = (x+y) % 2
     return 2 * (evenOdd) - 1
-  
+
   def getBoard(self, x, y):
     mask = 2 << (x*self.board_w + y)
     return self.board & mask == mask
-  
+
   def setBoard(self, x, y):
     self.board |= 2 << (x*self.board_w + y)
-  
+
+  def setPrintableBoard(self, board, x, y, char):
+    if board[x][y] == ' ':
+      board[x][y] = char
+    elif board[x][y] == '-' and char == '|':
+      board[x][y] = '+'
+    elif board[x][y] == '|' and char == '-':
+      board[x][y] = '+'
+
   def printBoard(self):
     board2 = [[-1 for _ in range(self.board_w)] for __ in range(self.board_h)]
     x = y = 0
@@ -176,18 +184,42 @@ class PartialSolution(threading.Thread):
       for i, j in doubleIter(len(piece), len(piece[0])):
         if piece[i][j] == 1:
           board2[x+i][y+j-offset] = pieceNum
-    for line in board2:
-      row = ' '
-      for cell in line:
-        row += ' 0123456789ABCDEF'[cell+1]
-      print row
-  
+
+    board3 = [[' ' for _ in range(self.board_w*10+1)] for __ in range(self.board_h*5+1)]
+    # Fixing some corners
+    board3[0][self.board_w*10] = '-'
+    board3[self.board_h*5][0] = '|'
+    board3[self.board_h*5][self.board_w*10] = '+'
+    for x in range(len(board2)):
+      for y in range(len(board2[x])):
+        if x == 0: # Top row
+          for j in range(10):
+            self.setPrintableBoard(board3, x*5+0, y*10+j, '-')
+        elif board2[x][y] != board2[x-1][y]: # Internal row
+          for j in range(11):
+            self.setPrintableBoard(board3, x*5+0, y*10+j, '-')
+        if x == self.board_h-1: # Bottom row
+          for j in range(10):
+            self.setPrintableBoard(board3, x*5+5, y*10+j, '-')
+        if y == 0: # Left column
+          for i in range(5):
+            self.setPrintableBoard(board3, x*5+i, y*10+0, '|')
+        elif board2[x][y] != board2[x][y-1]: # Internal column
+          for i in range(6):
+            self.setPrintableBoard(board3, x*5+i, y*10+0, '|')
+        if y == self.board_w-1: # Right column
+          for i in range(5):
+            self.setPrintableBoard(board3, x*5+i, y*10+10, '|')
+
+    for line in board3:
+      print ''.join(line)
+
   def run(self):
     while True:
       try:
         _cost, self = q.get(True, 1)
         self.cost = _cost
-      except Queue.Empty:
+      except Empty:
         return
       global maxCost
       if self.cost > maxCost and maxCost != -1:
@@ -203,7 +235,7 @@ class PartialSolution(threading.Thread):
           return
         q.task_done()
         continue
-      
+
       # Locating the first available space
       for self.x, self.y in doubleIter(self.board_h, self.board_w):
         if self.getBoard(self.x, self.y):
@@ -232,7 +264,7 @@ class PartialSolution(threading.Thread):
             if abs(self.parity) == self.parityLimit and parity * self.parity > 0:
               continue # At parity limit and this placement only increases said limit
             newSolution.parity += parity
-          
+
           invalidPlacement = False
           for i, j in doubleIter(len(piece), len(piece[0])):
             if piece[i][j] == 1:
@@ -258,32 +290,31 @@ class PartialSolution(threading.Thread):
 
 challenges = {
   # 'Name': ['Pieces', Height, Width],
-  'Connector':  ['T0, T0, L1', 3, 4], # Tied (3)
-  'A':          ['I1, L1, J1, Z0', 4, 4], # Better (1)
-  'Cube':       ['T0, T0, L1, Z0', 4, 4], # Tied (4)
-  'Floor 1':    ['L1, Z0, L1, Z0', 4, 4], # Tied (4)
-  'Recorder':   ['T0, T0, J1, S0, Z0', 5, 4], # Better (3)
-  'Fan':        ['T0, T0, L1, S0, Z0', 5, 4], # Tied (4)
-  'B':          ['I1, T0, T0, L1, Z0', 5, 4], # Tied (5)
-  'C':          ['T0, T0, J1, J1, L1, Z0', 6, 4], # Better (2)
-  'Platform':   ['I1, S0, T0, T0, L1, Z0', 6, 4], # Tied (5)
-  'Floor 6':    ['O0, S0, S0, S0, S0, L0, L0, L0, L0', 6, 6], # Tied (8)
-  'Floor 2':    ['O0, T0, T0, T0, T0, L1, L1, L1, L1', 6, 6], # Better (7)
-  'A star':     ['T0, T0, T0, T0, L1, J1, S0, S0, Z0, Z0', 5, 8], # Better (6)
-  'B star':     ['I1, I1, O0, T0, T0, T0, T0, L1, L1, J1', 5, 8], # Better (3)
-  'C star':     ['L1, J1, S0, Z0, T0, T0, I1, I1, O0, O0', 5, 8], # Better (2)
-  'Floor 3':    ['I1, I1, I1, I1, J1, J1, L1, L1, S0, Z0', 5, 8], # Better (3)
-  'Floor 4':    ['O0, O0, T0, T0, T0, T0, J1, L1, S0, S0, Z0, Z0', 8, 6], # Better (4)
-  'Floor 5':    ['I1, I1, O0, O0, O0, O0, T0, T0, T0, T0, J1, L1, S0, Z0', 7, 8], # Better (4)
+  'Connector':  ['T0, T0, L1', 3, 4], # 3
+  'A':          ['I1, L1, J1, Z0', 4, 4], # 1
+  'Cube':       ['T0, T0, L1, Z0', 4, 4], # 4
+  'Floor 1':    ['L1, Z0, L1, Z0', 4, 4], # 4
+  'Recorder':   ['T0, T0, J1, S0, Z0', 5, 4], # 3
+  'Fan':        ['T0, T0, L1, S0, Z0', 5, 4], # 4
+  'B':          ['I1, T0, T0, L1, Z0', 5, 4], # 5
+  'C':          ['T0, T0, J1, J1, L1, Z0', 6, 4], # 2
+  'Platform':   ['I1, S0, T0, T0, L1, Z0', 6, 4], # 5
+  'Floor 6':    ['O0, S0, S0, S0, S0, L0, L0, L0, L0', 6, 6], # 8
+  'Floor 2':    ['O0, T0, T0, T0, T0, L1, L1, L1, L1', 6, 6], # 7
+  'A star':     ['T0, T0, T0, T0, L1, J1, S0, S0, Z0, Z0', 5, 8], # 6
+  'B star':     ['I1, I1, O0, T0, T0, T0, T0, L1, L1, J1', 5, 8], # 3
+  'C star':     ['L1, J1, S0, Z0, T0, T0, I1, I1, O0, O0', 5, 8], # 2
+  'Floor 3':    ['I1, I1, I1, I1, J1, J1, L1, L1, S0, Z0', 5, 8], # 3
+  'Floor 4':    ['O0, O0, T0, T0, T0, T0, J1, L1, S0, S0, Z0, Z0', 8, 6], # 4
+  'Floor 5':    ['I1, I1, O0, O0, O0, O0, T0, T0, T0, T0, J1, L1, S0, Z0', 7, 8], # 4
 }
 
-NUMTHREADS = 8
-MAXSOLNS = -1 # Set to -1 for all solutions. Set to 0 to calculate only cost.
-import copy
-import Queue
-import time
+NUMTHREADS = 16
+MAXSOLNS = 1 # Set to -1 for all solutions. Set to 0 to calculate only cost.
+from Queue import PriorityQueue, Empty
+from time import time
 
-lock = threading.Lock()
+lock = Lock()
 for title in challenges.keys():
   data = challenges[title]
   TCount = 0
@@ -298,9 +329,10 @@ for title in challenges.keys():
   solutions = []
   global uuid
   uuid = 0
-  startTime = time.time()
-  
-  q = Queue.PriorityQueue()
+  print 'Challenge "{name}" using {num} pieces: {pieces}'.format(name=title, num = len(pieces), pieces=pieces)
+  startTime = time()
+
+  q = PriorityQueue()
   # cost, PartialSolution(root=(board, board_h, board_w, pieces, steps, parity, parityLimit, x, y, uuid))
   q.put((0, PartialSolution(root=(0L, data[1], data[2], list(pieces), [], 0, TCount/2, 0, 0, 0))))
   threads = []
@@ -311,8 +343,7 @@ for title in challenges.keys():
     thread.start()
   for thread in threads:
     thread.join()
-  print 'Challenge "{name}" using pieces {pieces}'.format(name=title, pieces=pieces)
-  print 'Took {time} seconds using {partials} partials.'.format(time=time.time()-startTime, partials = uuid)
+  print 'Took {time} seconds using {partials} partials.'.format(time=time()-startTime, partials = uuid)
   print 'Found {num} solution{s} with {cost} rotations:'.format(num=len(solutions), s=('s' if len(solutions) != 1 else ''), cost=maxCost)
   for solution in solutions:
     solution.printBoard()
