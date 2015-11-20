@@ -120,7 +120,7 @@ def getUUID():
 class PartialSolution(Thread):
   def __init__(self, root=None):
     if root != None:
-      self.board, self.board_h, self.board_w, self.pieces, self.steps, self.parity, self.parityLimit, self.x, self.y, self.uuid = root
+      self.board, self.board_h, self.board_w, self.pieces, self.steps, self.x, self.y, self.uuid = root
       return
     super(PartialSolution, self).__init__()
 
@@ -139,8 +139,6 @@ class PartialSolution(Thread):
       self.board_w,
       list(self.pieces),
       list(self.steps),
-      self.parity,
-      self.parityLimit,
       self.x,
       self.y,
       self.uuid, # Will be changed later IF the new copy survives
@@ -153,9 +151,10 @@ class PartialSolution(Thread):
       return True
     return self.getBoard(x, y)
 
-  def getParity(self, x, y):
-    evenOdd = (x+y) % 2
-    return 2 * (evenOdd) - 1
+  # Returns 1 or -1, depending on parity.
+  # def getParity(self, x, y):
+  #   evenOdd = (x+y) % 2
+  #   return 2 * (evenOdd) - 1
 
   def getBoard(self, x, y):
     mask = 2 << (x*self.board_w + y)
@@ -165,7 +164,7 @@ class PartialSolution(Thread):
     self.board |= 2 << (x*self.board_w + y)
 
   def setPrintableBoard(self, board, x, y, char):
-    if board[x][y] == ' ':
+    if board[x][y] == '/':
       board[x][y] = char
     elif board[x][y] == '-' and char == '|':
       board[x][y] = '+'
@@ -173,6 +172,7 @@ class PartialSolution(Thread):
       board[x][y] = '+'
 
   def printBoard(self):
+    # Board2 is reconstructed from the piece placement steps
     board2 = [[-1 for _ in range(self.board_w)] for __ in range(self.board_h)]
     x = y = 0
     for pieceNum, rotation in self.steps:
@@ -185,31 +185,42 @@ class PartialSolution(Thread):
         if piece[i][j] == 1:
           board2[x+i][y+j-offset] = pieceNum
 
-    board3 = [[' ' for _ in range(self.board_w*10+1)] for __ in range(self.board_h*5+1)]
+    # Board3 is constructed from board 2. It's just prettier :)
+    board3 = [['/' for _ in range(self.board_w*10+1)] for __ in range(self.board_h*5+1)]
     # Fixing some corners
     board3[0][self.board_w*10] = '-'
     board3[self.board_h*5][0] = '|'
     board3[self.board_h*5][self.board_w*10] = '+'
-    for x in range(len(board2)):
-      for y in range(len(board2[x])):
-        if x == 0: # Top row
-          for j in range(10):
-            self.setPrintableBoard(board3, x*5+0, y*10+j, '-')
-        elif board2[x][y] != board2[x-1][y]: # Internal row
-          for j in range(11):
-            self.setPrintableBoard(board3, x*5+0, y*10+j, '-')
-        if x == self.board_h-1: # Bottom row
-          for j in range(10):
-            self.setPrintableBoard(board3, x*5+5, y*10+j, '-')
-        if y == 0: # Left column
-          for i in range(5):
-            self.setPrintableBoard(board3, x*5+i, y*10+0, '|')
-        elif board2[x][y] != board2[x][y-1]: # Internal column
-          for i in range(6):
-            self.setPrintableBoard(board3, x*5+i, y*10+0, '|')
-        if y == self.board_w-1: # Right column
-          for i in range(5):
-            self.setPrintableBoard(board3, x*5+i, y*10+10, '|')
+    for x, y in doubleIter(len(board2), len(board2[x])):
+      if board2[x][y] != -1: # Piece internal
+        for i, j in doubleIter(4, 9):
+          self.setPrintableBoard(board3, x*5+i+1, y*10+j+1, ' ')
+        if x > 0 and board2[x][y] == board2[x-1][y]: # Piece internal row
+          for j in range(1, 10):
+            self.setPrintableBoard(board3, x*5, y*10+j, ' ')
+        if y > 0 and board2[x][y] == board2[x][y-1]: # Piece internal column
+          for i in range(1, 5):
+            self.setPrintableBoard(board3, x*5+i, y*10, ' ')
+        if x > 0 and y > 0 and board2[x][y] == board2[x-1][y] and board2[x][y] == board2[x][y-1]: # O piece internal
+          self.setPrintableBoard(board3, x*5, y*10, ' ')
+      if x == 0: # Top row
+        for j in range(10):
+          self.setPrintableBoard(board3, x*5, y*10+j, '-')
+      elif board2[x][y] != board2[x-1][y]: # Internal row
+        for j in range(11):
+          self.setPrintableBoard(board3, x*5, y*10+j, '-')
+      if x == self.board_h-1: # Bottom row
+        for j in range(10):
+          self.setPrintableBoard(board3, (x+1)*5, y*10+j, '-')
+      if y == 0: # Left column
+        for i in range(5):
+          self.setPrintableBoard(board3, x*5+i, y*10, '|')
+      elif board2[x][y] != board2[x][y-1]: # Internal column
+        for i in range(6):
+          self.setPrintableBoard(board3, x*5+i, y*10, '|')
+      if y == self.board_w-1: # Right column
+        for i in range(5):
+          self.setPrintableBoard(board3, x*5+i, (y+1)*10, '|')
 
     for line in board3:
       print ''.join(line)
@@ -224,6 +235,7 @@ class PartialSolution(Thread):
       global maxCost
       if self.cost > maxCost and maxCost != -1:
         continue
+      # Completed solution, since all pieces are placed
       if len(self.pieces) == len(self.steps):
         global solutions
         if len(solutions) == 0:
@@ -248,22 +260,23 @@ class PartialSolution(Thread):
             continue
           pieceName, initialRotation = self.pieces[pieceNum]
           offset, piece = tetrominos[(pieceName, (initialRotation+rotation) % 4)]
+          if piece == 'Invalid': # For pieces like the O which cannot be rotated further
+            continue
           # Avoiding duplicates
           if (pieceName, (initialRotation+rotation) % 4) in self.attempted_pieces:
             continue
           self.attempted_pieces.append((pieceName, (initialRotation+rotation) % 4))
-          if piece == 'Invalid': # For pieces like the O which cannot be rotated further
-            continue
           newSolution = self.clone()
           # T pieces have a kind of parity. Consider the board to be a checkerboard,
           # then a T piece covers 3 black and 1 white squares, whereas all other pieces
           # cover 2 and 2. Thus, you must have an even number of T pieces AND
           # exactly half must be placed on white and half on black.
-          if pieceName == 'T':
-            parity = self.getParity(self.x, self.y)
-            if abs(self.parity) == self.parityLimit and parity * self.parity > 0:
-              continue # At parity limit and this placement only increases said limit
-            newSolution.parity += parity
+          # I never saw a solution in which this branch triggered.
+          # if pieceName == 'T':
+          #   parity = self.getParity(self.x, self.y)
+          #   if abs(self.parity) == self.parityLimit and parity * self.parity > 0:
+          #     continue # At parity limit and this placement only increases said limit
+          #   newSolution.parity += parity
 
           invalidPlacement = False
           for i, j in doubleIter(len(piece), len(piece[0])):
@@ -317,12 +330,16 @@ from time import time
 lock = Lock()
 for title in challenges.keys():
   data = challenges[title]
-  TCount = 0
   pieces = data[0].split(', ')
+  if len(pieces) * 4 != data[1]*data[2]:
+    raise ValueError('Board size', data[1]*data[2], 'does not fit piece size', len(pieces)*4)
+  TCount = 0
   for i in range(len(pieces)):
     if pieces[i][0] == 'T':
       TCount += 1
     pieces[i] = (pieces[i][0], int(pieces[i][1]))
+  if TCount%2 != 0: # See parity comment above.
+    raise ValueError('Solutions must have an even number of T pieces.')
   global maxCost
   maxCost = -1
   global solutions
@@ -333,8 +350,8 @@ for title in challenges.keys():
   startTime = time()
 
   q = PriorityQueue()
-  # cost, PartialSolution(root=(board, board_h, board_w, pieces, steps, parity, parityLimit, x, y, uuid))
-  q.put((0, PartialSolution(root=(0L, data[1], data[2], list(pieces), [], 0, TCount/2, 0, 0, 0))))
+  # cost, PartialSolution(root=(board, board_h, board_w, pieces, steps, x, y, uuid))
+  q.put((0, PartialSolution(root=(0L, data[1], data[2], list(pieces), [], 0, 0, 0))))
   threads = []
   for i in range(NUMTHREADS):
     thread = PartialSolution()
