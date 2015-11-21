@@ -297,6 +297,17 @@ class PartialSolution(Thread):
           #       if self.isInvalid(self.x+2, j):
           #           invalidPlacement = True
           #           break
+          if len(piece[0]) + self.y == self.board_h: # Piece placed touches the end of the board
+            spaces = 0
+            i = 0
+            while not self.getBoard(i, self.board_h-1) and i < self.board_w:
+              spaces += 1
+              i += 1
+            for j in range(i):
+              if not self.getBoard(i, self.board_h-2):
+                spaces += 1
+            if spaces%4 != 0:
+              continue # Impossible to fill remaining gap.
           newSolution.uuid = getUUID()
           newSolution.pieces[pieceNum] = None
           newSolution.steps.append((pieceNum, rotation))
