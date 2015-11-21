@@ -232,6 +232,8 @@ class PartialSolution(Thread):
   def run(self):
     while True:
       try:
+        from Queue import Empty
+        global q, pieces
         _cost, self = q.get(True, 1)
         self.cost = _cost
       except Empty:
@@ -244,6 +246,7 @@ class PartialSolution(Thread):
         global solutions
         if len(solutions) == 0:
           maxCost = self.cost
+        global MAXSOLNS
         if len(solutions) == MAXSOLNS:
           return
         solutions.append(self)
@@ -314,67 +317,90 @@ class PartialSolution(Thread):
           q.put((self.cost + rotation, newSolution))
       q.task_done()
 
-challenges = {
-  # 'Name': ['Pieces', Height, Width],
-  'Connector':  ['T0, T0, L1', 3, 4], # 3
-  'A':          ['I1, L1, J1, Z0', 4, 4], # 1
-  'Cube':       ['T0, T0, L1, Z0', 4, 4], # 4
-  'Floor 1':    ['L1, Z0, L1, Z0', 4, 4], # 4
-  'Recorder':   ['T0, T0, J1, S0, Z0', 5, 4], # 3
-  'Fan':        ['T0, T0, L1, S0, Z0', 5, 4], # 4
-  'B':          ['I1, T0, T0, L1, Z0', 5, 4], # 5
-  'C':          ['T0, T0, J1, J1, L1, Z0', 6, 4], # 2
-  'Platform':   ['I1, S0, T0, T0, L1, Z0', 6, 4], # 5
-  'Floor 6':    ['O0, S0, S0, S0, S0, L0, L0, L0, L0', 6, 6], # 8
-  'Floor 2':    ['O0, T0, T0, T0, T0, L1, L1, L1, L1', 6, 6], # 7
-  'A star':     ['T0, T0, T0, T0, L1, J1, S0, S0, Z0, Z0', 5, 8], # 6
-  'B star':     ['I1, I1, O0, T0, T0, T0, T0, L1, L1, J1', 5, 8], # 3
-  'C star':     ['L1, J1, S0, Z0, T0, T0, I1, I1, O0, O0', 5, 8], # 2
-  'Floor 3':    ['I1, I1, I1, I1, J1, J1, L1, L1, S0, Z0', 5, 8], # 3
-  'Floor 4':    ['O0, O0, T0, T0, T0, T0, J1, L1, S0, S0, Z0, Z0', 8, 6], # 4
-  'Floor 5':    ['I1, I1, O0, O0, O0, O0, T0, T0, T0, T0, J1, L1, S0, Z0', 7, 8], # 4
-}
+def randomChallenge(x, y):
+  from random import randint
+  numPieces = x*y/4
+  pieces = 'I0, I0, I1, I1, J0, J1, J2, J3, L0, L1, L2, L3, O0, O0, O0, O0, S0, S0, S1, S1, T0, T1, T2, T3, Z0, Z0, Z1, Z1'.split(', ')
+  pieceList = ''
+  for i in range(numPieces):
+    r = randint(0, len(pieces)-1)
+    pieceList += pieces[r] + ', '
+  if pieceList.count('T') % 2 != 0:
+    return randomChallenge(x, y)
+  return [pieceList[:-2], x, y]
 
-NUMTHREADS = 16
-MAXSOLNS = 1 # Set to -1 for all solutions. Set to 0 to calculate only cost.
-from Queue import PriorityQueue, Empty
-from time import time
+# Set MAXSOLNS -1 for all solutions. Set to 0 to calculate only cost.
+def solve(challenges, NUMTHREADS, _MAXSOLNS, benchmark=False):
+  global MAXSOLNS
+  MAXSOLNS = _MAXSOLNS
+  from Queue import PriorityQueue
+  from time import time
+  timeData = [[len(challenges), 0.0], [0, 0.0]]
 
-lock = Lock()
-for title in challenges.keys():
-  data = challenges[title]
-  pieces = data[0].split(', ')
-  if len(pieces) * 4 != data[1]*data[2]:
-    raise ValueError('Board size', data[1]*data[2], 'does not fit piece size', len(pieces)*4)
-  TCount = 0
-  for i in range(len(pieces)):
-    if pieces[i][0] == 'T':
-      TCount += 1
-    pieces[i] = (pieces[i][0], int(pieces[i][1]))
-  if TCount%2 != 0: # See parity comment above.
-    raise ValueError('Solutions must have an even number of T pieces.')
-  global maxCost
-  maxCost = -1
-  global solutions
-  solutions = []
-  global uuid
+  global uuid, maxCost, solutions, pieces
   uuid = 0
-  print 'Challenge "{name}" using {num} pieces: {pieces}'.format(name=title, num = len(pieces), pieces=pieces)
-  startTime = time()
+  for title in sorted(challenges.keys(), key=lambda s: int(s)):
+    data = challenges[title]
+    maxCost = -1
+    solutions = []
+    pieces = data[0].split(', ')
 
-  q = PriorityQueue()
-  # cost, PartialSolution(root=(board, board_h, board_w, pieces, steps, x, y, uuid))
-  q.put((0, PartialSolution(root=(0L, data[1], data[2], list(pieces), [], 0, 0, 0))))
-  threads = []
-  for i in range(NUMTHREADS):
-    thread = PartialSolution()
-    thread.daemon = True
-    threads.append(thread)
-    thread.start()
-  for thread in threads:
-    thread.join()
-  print 'Took {time} seconds using {partials} partials.'.format(time=time()-startTime, partials = uuid)
-  print 'Found {num} solution{s} with {cost} rotations:'.format(num=len(solutions), s=('s' if len(solutions) != 1 else ''), cost=maxCost)
-  for solution in solutions:
-    solution.printBoard()
-    print
+    TCount = 0
+    for i in range(len(pieces)):
+      if pieces[i][0] == 'T':
+        TCount += 1
+      pieces[i] = (pieces[i][0], int(pieces[i][1]))
+
+    print 'Challenge "{name}" using {num} pieces: {pieces}'.format(name=title, num = len(pieces), pieces=''.join([a+str(b) for a,b in pieces]))
+    startTime = time()
+
+    global q
+    q = PriorityQueue()
+    # cost, PartialSolution(root=(board, board_h, board_w, pieces, steps, parity, x, y, uuid))
+    q.put((0, PartialSolution(root=(0L, data[1], data[2], list(pieces), [], [TCount/2, TCount/2], 0, 0, uuid))))
+    threads = []
+    for i in range(NUMTHREADS):
+      thread = PartialSolution()
+      thread.daemon = True # Allows for ^C to kill threads
+      threads.append(thread)
+      thread.start()
+    for thread in threads:
+      thread.join()
+    runtime = time()-startTime
+    print 'Took {time} seconds using {partials} partials.'.format(time=runtime, partials = uuid)
+    print 'Found {num} solution{s} with {cost} rotations.'.format(num=len(solutions), s=('s' if len(solutions) != 1 else ''), cost=maxCost)
+    if len(solutions) == 0:
+      timeData[1][0] += 1
+      timeData[1][1] += runtime
+      continue
+    timeData[0][0] -= 1
+    timeData[0][1] += runtime
+    for solution in solutions:
+      solution.printBoard()
+  print 'Average time for success:', timeData[0][1]/timeData[0][0]
+  print 'Average time for failure:', timeData[1][1]/timeData[1][0]
+  print 'Average overall:', (timeData[0][1]+timeData[1][1])/(timeData[0][0]+timeData[1][0])
+
+if __name__ == "__main__":
+
+  challenges = {
+    # 'Name': ['Pieces', Height, Width],
+    'Connector':  ['T0, T0, L1', 3, 4], # 3
+    'A':          ['I1, L1, J1, Z0', 4, 4], # 1
+    'Cube':       ['T0, T0, L1, Z0', 4, 4], # 4
+    'Floor 1':    ['L1, Z0, L1, Z0', 4, 4], # 4
+    'Recorder':   ['T0, T0, J1, S0, Z0', 5, 4], # 3
+    'Fan':        ['T0, T0, L1, S0, Z0', 5, 4], # 4
+    'B':          ['I1, T0, T0, L1, Z0', 5, 4], # 5
+    'C':          ['T0, T0, J1, J1, L1, Z0', 6, 4], # 2
+    'Platform':   ['I1, S0, T0, T0, L1, Z0', 6, 4], # 5
+    'Floor 6':    ['O0, S0, S0, S0, S0, L0, L0, L0, L0', 6, 6], # 8
+    'Floor 2':    ['O0, T0, T0, T0, T0, L1, L1, L1, L1', 6, 6], # 7
+    'A star':     ['T0, T0, T0, T0, L1, J1, S0, S0, Z0, Z0', 5, 8], # 6
+    'B star':     ['I1, I1, O0, T0, T0, T0, T0, L1, L1, J1', 5, 8], # 3
+    'C star':     ['L1, J1, S0, Z0, T0, T0, I1, I1, O0, O0', 5, 8], # 2
+    'Floor 3':    ['I1, I1, I1, I1, J1, J1, L1, L1, S0, Z0', 5, 8], # 3
+    'Floor 4':    ['O0, O0, T0, T0, T0, T0, J1, L1, S0, S0, Z0, Z0', 8, 6], # 4
+    'Floor 5':    ['I1, I1, O0, O0, O0, O0, T0, T0, T0, T0, J1, L1, S0, Z0', 7, 8], # 4
+  }
+  solve(challenges, 16, 1)
