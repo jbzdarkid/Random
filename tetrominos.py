@@ -101,9 +101,12 @@ tetrominos = {
   ('Z', 3): ('!', 'Invalid'),
 }
 
-def doubleIter(xmax, ymax):
-  for x in range(xmax):
-    for y in range(ymax):
+def doubleIter(xmax, ymax, start=(0, 0)):
+  xmin, ymin = start
+  for y in range(ymin, ymax):
+    yield (xmin, y)
+  for x in range(xmin+1, xmax):
+    for y in range(0, ymax):
       yield (x, y)
 
 from threading import Lock, Thread
@@ -178,7 +181,7 @@ class PartialSolution(Thread):
     for pieceNum, rotation in self.steps:
       pieceName, initialRotation = pieces[pieceNum]
       offset, piece = tetrominos[(pieceName, (initialRotation+rotation) % 4)]
-      for x, y in doubleIter(self.board_h, self.board_w):
+      for x, y in doubleIter(self.board_h, self.board_w, start=(x, y)):
         if board2[x][y] == -1:
           break
       for i, j in doubleIter(len(piece), len(piece[0])):
@@ -249,10 +252,9 @@ class PartialSolution(Thread):
         continue
 
       # Locating the first available space
-      for self.x, self.y in doubleIter(self.board_h, self.board_w):
-        if self.getBoard(self.x, self.y):
-          continue
-        break
+      for self.x, self.y in doubleIter(self.board_h, self.board_w, start=(self.x, self.y)):
+        if not self.getBoard(self.x, self.y):
+          break
       self.attempted_pieces = []
       for rotation in range(0, 4):
         for pieceNum in range(len(self.pieces)):
