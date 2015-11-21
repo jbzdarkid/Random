@@ -123,7 +123,7 @@ def getUUID():
 class PartialSolution(Thread):
   def __init__(self, root=None):
     if root != None:
-      self.board, self.board_h, self.board_w, self.pieces, self.steps, self.x, self.y, self.uuid = root
+      self.board, self.board_h, self.board_w, self.pieces, self.steps, self.parity, self.x, self.y, self.uuid = root
       return
     super(PartialSolution, self).__init__()
 
@@ -142,6 +142,7 @@ class PartialSolution(Thread):
       self.board_w,
       list(self.pieces),
       list(self.steps),
+      list(self.parity),
       self.x,
       self.y,
       self.uuid, # Will be changed later IF the new copy survives
@@ -153,11 +154,6 @@ class PartialSolution(Thread):
     if x >= self.board_h or y >= self.board_w:
       return True
     return self.getBoard(x, y)
-
-  # Returns 1 or -1, depending on parity.
-  # def getParity(self, x, y):
-  #   evenOdd = (x+y) % 2
-  #   return 2 * (evenOdd) - 1
 
   def getBoard(self, x, y):
     mask = 2 << (x*self.board_w + y)
@@ -273,12 +269,11 @@ class PartialSolution(Thread):
           # then a T piece covers 3 black and 1 white squares, whereas all other pieces
           # cover 2 and 2. Thus, you must have an even number of T pieces AND
           # exactly half must be placed on white and half on black.
-          # I never saw a solution in which this branch triggered.
-          # if pieceName == 'T':
-          #   parity = self.getParity(self.x, self.y)
-          #   if abs(self.parity) == self.parityLimit and parity * self.parity > 0:
-          #     continue # At parity limit and this placement only increases said limit
-          #   newSolution.parity += parity
+          if pieceName == 'T':
+            parity = (self.x+self.y) % 2
+            if self.parity[parity] == 0:
+              continue # This piece would cause >50% of the pieces to be of this type.
+            newSolution.parity[parity] -= 1
 
           invalidPlacement = False
           for i, j in doubleIter(len(piece), len(piece[0])):
