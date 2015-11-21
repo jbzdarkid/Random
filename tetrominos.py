@@ -170,7 +170,7 @@ class PartialSolution(Thread):
     elif board[x][y] == '|' and char == '-':
       board[x][y] = '+'
 
-  def printBoard(self):
+  def printBoard(self, simple=False):
     # Board2 is reconstructed from the piece placement steps
     board2 = [[-1 for _ in range(self.board_w)] for __ in range(self.board_h)]
     x = y = 0
@@ -183,6 +183,11 @@ class PartialSolution(Thread):
       for i, j in doubleIter(len(piece), len(piece[0])):
         if piece[i][j] == 1:
           board2[x+i][y+j-offset] = pieceNum
+    if simple:
+      chars = '_1234567890ABCDEF'
+      for row in board2:
+        print ''.join(chars[i+1] for i in row)
+      return
 
     # Board3 is constructed from board 2. It's just prettier :)
     board3 = [['/' for _ in range(self.board_w*10+1)] for __ in range(self.board_h*5+1)]
