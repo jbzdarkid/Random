@@ -288,6 +288,8 @@ class PartialSolution(Thread):
                 invalidPlacement = True
                 break
               newSolution.setBoard(self.x+i, self.y+j-offset)
+          if invalidPlacement:
+            continue
           # Checking for 1x1 holes in the next row is inefficient, as it happens very rarely (1-2%).
           # if self.x < self.board_h:
           #   for j in range(1, self.board_w-1):
@@ -295,8 +297,6 @@ class PartialSolution(Thread):
           #       if self.isInvalid(self.x+2, j):
           #           invalidPlacement = True
           #           break
-          if invalidPlacement:
-            continue
           newSolution.uuid = getUUID()
           newSolution.pieces[pieceNum] = None
           newSolution.steps.append((pieceNum, rotation))
