@@ -5,13 +5,22 @@ from threading import Lock, Thread
 from time import sleep
 from urllib import urlretrieve
 from urllib2 import urlopen
+from os import chdir, mkdir
 
 # Credit to Vinko Vrsalovic on http://stackoverflow.com/questions/295135/turn-a-string-into-a-valid-filename-in-python
 import string
 valid_chars = '-_.() %s%s' % (string.ascii_letters, string.digits)
 
+try:
+	mkdir('Bandcamp')
+except OSError:
+	pass
+finally:
+	chdir('Bandcamp')
 lock = Lock()
 data = urlopen('https://harrycallaghan.bandcamp.com/album/tier-3-soundtrack').read()
+m = search('<link rel="image_src" href="(.*?)">', data)
+urlretrieve(m.group(1), 'Cover.jpg')
 m = search('trackinfo :(.*),', data)
 dict = loads(m.group(1))
 numTracks = len(dict)
@@ -52,7 +61,7 @@ for i in order:
 		'i': i})
 	threads[i] = thread
 	thread.start()
-	sleep(0.1)
+	sleep(0.8)
 
 for thread in threads:
 	thread.join()

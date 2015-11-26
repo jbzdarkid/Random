@@ -382,6 +382,15 @@ def solve(challenges, NUMTHREADS, _MAXSOLNS, benchmark=False):
   print 'Average overall:', (timeData[0][1]+timeData[1][1])/(timeData[0][0]+timeData[1][0])
 
 if __name__ == "__main__":
+  challenges = {}
+  for i in range(100):
+    challenges[i] = randomChallenge(4, 8)
+  solve(challenges, 16, 1)
+  # 8x4/16/1: 0.822034445302 / 1.28229255101
+  # 4x8/16/1: 0.886895217214 / 2.44669955117
+  # 4x8/16/1 with improved startpos:
+  '''
+
 
   challenges = {
     # 'Name': ['Pieces', Height, Width],
@@ -404,3 +413,4 @@ if __name__ == "__main__":
     'Floor 5':    ['I1, I1, O0, O0, O0, O0, T0, T0, T0, T0, J1, L1, S0, Z0', 7, 8], # 4
   }
   solve(challenges, 16, 1)
+  '''

@@ -60,7 +60,7 @@ def test_line(filter, filter_out, line):
 for filter in search:
 	for filter_out in search:
 		score = (len(filter)+len(filter_out))**1.5
-	
+
 		skip = False
 		for line in must_hit:
 			ret = test_line(filter, filter_out, line)
@@ -90,10 +90,11 @@ for filter in search:
 				score -= 2
 			if ret == 2:
 				score -= 4
-				
+
 		if score > 0:
 			output.append([score, filter, filter_out])
 
 for o in sorted(output):
 	print round(o[0], 1), 'con_filter_text "'+o[1]+'"; con_filter_text_out "'+o[2]+'"'
-print len(output), 'valid options of', len(search)**2, 'possibilities.'
+print len(output), len(search4
+''), '% valid'

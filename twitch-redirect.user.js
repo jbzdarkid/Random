@@ -7,9 +7,9 @@ var url = "";
 var path = window.location.pathname.split('/');
 var host = window.location.protocol+"//"+window.location.host+"/"
 if (path.length == 2 && window.location.pathname != "/") {
-  url = host+path[1]+"/popout";
+  url = "player.twitch.tv?channel="+path[1];
 } else if (path.length == 4 && path[2] != "profile") {
-  url = host+path[1]+"/popout?videoId="+path[2]+path[3];
+  url = "player.twitch.tv?video="+path[2]+path[3];
   if (window.location.search !== "") {
     url += "&"+window.location.search.slice(1); // Cuts initial ?
   }
