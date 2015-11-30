@@ -314,6 +314,8 @@ class PartialSolution(Thread):
           newSolution.uuid = getUUID()
           newSolution.pieces[pieceNum] = None
           newSolution.steps.append((pieceNum, rotation))
+          if rotation != 0: # First rotation is free because you can right-click the piece
+            rotation -= 1
           q.put((self.cost + rotation, newSolution))
       q.task_done()
 
@@ -335,11 +337,11 @@ def solve(challenges, NUMTHREADS, _MAXSOLNS, benchmark=False):
   MAXSOLNS = _MAXSOLNS
   from Queue import PriorityQueue
   from time import time
-  timeData = [[len(challenges), 0.0], [0, 0.0]]
+  timeData = [[0, 0.0], [0, 0.0]]
 
   global uuid, maxCost, solutions, pieces
   uuid = 0
-  for title in sorted(challenges.keys(), key=lambda s: int(s)):
+  for title in sorted(challenges.keys()):
     data = challenges[title]
     maxCost = -1
     solutions = []
@@ -351,7 +353,7 @@ def solve(challenges, NUMTHREADS, _MAXSOLNS, benchmark=False):
         TCount += 1
       pieces[i] = (pieces[i][0], int(pieces[i][1]))
 
-    print 'Challenge "{name}" using {num} pieces: {pieces}'.format(name=title, num = len(pieces), pieces=''.join([a+str(b) for a,b in pieces]))
+    print 'Challenge "{name}" using {num} pieces: {pieces}'.format(name=title, num = len(pieces), pieces=', '.join([a+str(b) for a,b in pieces]))
     startTime = time()
 
     global q
@@ -373,44 +375,44 @@ def solve(challenges, NUMTHREADS, _MAXSOLNS, benchmark=False):
       timeData[1][0] += 1
       timeData[1][1] += runtime
       continue
-    timeData[0][0] -= 1
+    timeData[0][0] += 1
     timeData[0][1] += runtime
     for solution in solutions:
       solution.printBoard()
-  print 'Average time for success:', timeData[0][1]/timeData[0][0]
-  print 'Average time for failure:', timeData[1][1]/timeData[1][0]
-  print 'Average overall:', (timeData[0][1]+timeData[1][1])/(timeData[0][0]+timeData[1][0])
+  try:
+    print 'Average time for success:', timeData[0][1]/timeData[0][0]
+  except ZeroDivisionError:
+    print 'N/A'
+  try:
+    print 'Average time for failure:', timeData[1][1]/timeData[1][0]
+  except ZeroDivisionError:
+    print 'N/A'
+  try:
+    print 'Average overall:', (timeData[0][1]+timeData[1][1])/(timeData[0][0]+timeData[1][0])
+  except ZeroDivisionError:
+    print 'N/A'
 
 if __name__ == "__main__":
-  challenges = {}
-  for i in range(100):
-    challenges[i] = randomChallenge(4, 8)
-  solve(challenges, 16, 1)
-  # 8x4/16/1: 0.822034445302 / 1.28229255101
-  # 4x8/16/1: 0.886895217214 / 2.44669955117
-  # 4x8/16/1 with improved startpos:
-  '''
-
-
   challenges = {
     # 'Name': ['Pieces', Height, Width],
-    'Connector':  ['T0, T0, L1', 3, 4], # 3
-    'A':          ['I1, L1, J1, Z0', 4, 4], # 1
-    'Cube':       ['T0, T0, L1, Z0', 4, 4], # 4
-    'Floor 1':    ['L1, Z0, L1, Z0', 4, 4], # 4
-    'Recorder':   ['T0, T0, J1, S0, Z0', 5, 4], # 3
-    'Fan':        ['T0, T0, L1, S0, Z0', 5, 4], # 4
-    'B':          ['I1, T0, T0, L1, Z0', 5, 4], # 5
-    'C':          ['T0, T0, J1, J1, L1, Z0', 6, 4], # 2
-    'Platform':   ['I1, S0, T0, T0, L1, Z0', 6, 4], # 5
-    'Floor 6':    ['O0, S0, S0, S0, S0, L0, L0, L0, L0', 6, 6], # 8
-    'Floor 2':    ['O0, T0, T0, T0, T0, L1, L1, L1, L1', 6, 6], # 7
-    'A star':     ['T0, T0, T0, T0, L1, J1, S0, S0, Z0, Z0', 5, 8], # 6
-    'B star':     ['I1, I1, O0, T0, T0, T0, T0, L1, L1, J1', 5, 8], # 3
-    'C star':     ['L1, J1, S0, Z0, T0, T0, I1, I1, O0, O0', 5, 8], # 2
-    'Floor 3':    ['I1, I1, I1, I1, J1, J1, L1, L1, S0, Z0', 5, 8], # 3
-    'Floor 4':    ['O0, O0, T0, T0, T0, T0, J1, L1, S0, S0, Z0, Z0', 8, 6], # 4
-    'Floor 5':    ['I1, I1, O0, O0, O0, O0, T0, T0, T0, T0, J1, L1, S0, Z0', 7, 8], # 4
+    'Connector':  ['T0, T0, L1', 3, 4], # 1
+    'A':          ['I1, L1, J1, Z0', 4, 4], # 0
+    'Cube':       ['T0, T0, L1, Z0', 4, 4], # 1
+    'Floor 1':    ['L1, Z0, L1, Z0', 4, 4], # 1
+    'Recorder':   ['T0, T0, J1, S0, Z0', 5, 4], # 1
+    'Fan':        ['T0, T0, L1, S0, Z0', 5, 4], # 3
+    'B':          ['I1, T0, T0, L1, Z0', 5, 4], # 1
+    'C':          ['T0, T0, J1, J1, L1, Z0', 6, 4], # 0
+    'Platform':   ['I1, S0, T0, T0, L1, Z0', 6, 4], # 1
+    'Floor 6':    ['O0, S0, S0, S0, S0, L0, L0, L0, L0', 6, 6], # 3
+    'Floor 2':    ['O0, T0, T0, T0, T0, L1, L1, L1, L1', 6, 6], # 2
+    'A star':     ['T0, T0, T0, T0, L1, J1, S0, S0, Z0, Z0', 5, 8], # 1
+    'B star':     ['I1, I1, O0, T0, T0, T0, T0, L1, L1, J1', 5, 8], # 1
+    'C star':     ['L1, J1, S0, Z0, T0, T0, I1, I1, O0, O0', 5, 8], # 1
+    'Floor 3':    ['I1, I1, I1, I1, J1, J1, L1, L1, S0, Z0', 5, 8], # 0
+    'Floor 4':    ['O0, O0, T0, T0, T0, T0, J1, L1, S0, S0, Z0, Z0', 8, 6], # 1
+    'Floor 5':    ['I1, I1, O0, O0, O0, O0, T0, T0, T0, T0, J1, L1, S0, Z0', 7, 8], # 0
+    'DLC Silver': ['I1, T0, T0, L1, L1, J1, J1', 4, 7], # 1
+    'DLC Gold':   ['T0, S0, S0, T0, T0, I1, S0, I1, T0, L1', 8, 5], # 3
   }
-  solve(challenges, 16, 1)
-  '''
+  solve(challenges, 16, -1)
