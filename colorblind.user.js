@@ -1,6 +1,6 @@
 // ==UserScript==
 // @match http://*.when2meet.com/*
-// @version 1.1
+// @version 1.2
 // ==/UserScript==
 function ReColorIndividual() {
   for (var i=0;i<TimeOfSlot.length;i++) {
@@ -125,18 +125,20 @@ function ReColor() {
           document.getElementById("Day-"+Row+"-"+Column).style.backgroundColor='white';
           document.getElementById("Day-"+Row+"-"+Column).style.color='black';
         }
-
       }
     }
   }
 }
 var script = document.createElement('script');
-script.appendChild(document.createTextNode(ReColorIndividual + " ReColorIndividual();"));
+if (window.location.search == "") { // Meeting creation page (when2meet.com)
+  script.appendChild(document.createTextNode(ReColor + " ReColor();"));
+} else { // Meeting pages (when2meet.com/?asdfgjkl)
+  script.appendChild(document.createTextNode(ReColorIndividual + " ReColorIndividual();"));
 script.appendChild(document.createTextNode(ReColorGroup + " ReColorGroup();"));
-script.appendChild(document.createTextNode(ReColor + " ReColor();"));
+  // For the color scale under "Group's Availability"
+  var label = document.getElementById('YouGrid');
+  var targets = label.getElementsByTagName('td');
+  targets[0].setAttribute('bgcolor', 'white');
+  targets[1].setAttribute('bgcolor', 'blue');
+}
 (document.body || document.head || document.documentElement).appendChild(script);
-
-var label = document.getElementById('YouGrid');
-var targets = label.getElementsByTagName('td');
-targets[0].setAttribute('bgcolor', 'white');
-targets[1].setAttribute('bgcolor', 'blue');
