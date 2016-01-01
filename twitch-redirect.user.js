@@ -1,33 +1,30 @@
 // ==UserScript==
 // @match http://*.twitch.tv/*
-// @version 1.5
+// @version 1.6
 // ==/UserScript==
 
 var url = "";
 var path = window.location.pathname.split('/');
-var host = window.location.protocol+"//"+window.location.host+"/"
-if (path.length == 2 && window.location.pathname != "/") {
-  url = "player.twitch.tv?channel="+path[1];
-} else if (path.length == 4 && path[2] != "profile") {
-  url = "player.twitch.tv?video="+path[2]+path[3];
-  if (window.location.search !== "") {
-    url += "&"+window.location.search.slice(1); // Cuts initial ?
-  }
+
+if (path.length == 2 && path[1] !== "") { // twitch.tv/channel but not twitch.tv/ or player.twitch.tv/
+	url = "&html5&channel="+path[1];
+} else if (path.length == 4) {
+	if (path[2] == "profile") { // twitch.tv/channel/profile/highlights
+  	console.log("Path: "+path);
+  	// For videos in past broadcasts/highlights, the page isn't reloaded when you click them, so I change the url.
+		setTimeout(function(){
+			var body = document.body.innerHTML;
+			document.body.innerHTML = body.replace(/http:\/\/www\.twitch\.tv\/([\w\d]*)\/v\/(\d*)/g, "http://player.twitch.tv/?branding=false&showInfo=false&video=v$2");
+		}, 5000); // 5 second delay while page loads
+	} else { // twitch.tv/channel/v/numbers
+		url = "&video="+path[2]+path[3];
+	}
 }
 if (url !== "") {
-  var redir = "\n<meta http-equiv=\"refresh\" content=\"0; url="+url+"\">";
-  document.head.innerHTML += redir;
+	url = "http://player.twitch.tv/?branding=false&showInfo=false" + url
+	if (window.location.search !== "") { // Query string
+		url += "&"+window.location.search.slice(1); // Cuts initial ?
+	}
+	var redir = "\n<meta http-equiv=\"refresh\" content=\"0; url="+url+"\">";
+	document.head.innerHTML += redir;
 }
-
-// var body = document.body.innerHTML;
-// var find1 = /href="http:\/\/www\.twitch\.tv\/([a-zA-Z0-9]*)\/v\/([0-9]*)\?/;
-// var replace1 = /href="http:\/\/www.twitch.tv\/$1\/popout?videoId=$2&/;
-// var find2 = /href="http:\/\/www\.twitch\.tv\/([a-zA-Z0-9]*)\/v\/([0-9]*)/;
-// var replace2 = /href="http:\/\/www.twitch.tv\/$1\/popout?videoId=$2/;
-// var find3 = /twitch\.tv\/([a-zA-Z0-9]*)/;
-// var replace3 = /twitch.tv\/$1\/popout/;
-// console.log(body.search(/twitch\.tv\/([a-zA-Z0-9]*)/));
-// body.replace(find1, 'asdf1');
-// body.replace(find2, replace2);
-// body.replace(find3, replace3);
-// document.body.innerHTML = body;
