@@ -1,3 +1,6 @@
+DEBUG = False
+checks = [0, 0, 0, 0]
+
 tetrominos = {
   ('I', 0):
     (0,
@@ -145,9 +148,10 @@ class PartialSolution(Thread):
       list(self.parity),
       self.x,
       self.y,
-      self.uuid, # Will be changed later IF the new copy survives
+      getUUID(),
       ))
 
+  # Returns True if the point is out of bounds or if the point is filled.
   def isInvalid(self, x, y):
     if x < 0 or y < 0:
       return True
@@ -155,13 +159,16 @@ class PartialSolution(Thread):
       return True
     return self.getBoard(x, y)
 
+  # Returns 0 if board is empty, 1 otherwise.
   def getBoard(self, x, y):
     mask = 2 << (x*self.board_w + y)
     return self.board & mask == mask
 
+  # Sets a board square to 1.
   def setBoard(self, x, y):
     self.board |= 2 << (x*self.board_w + y)
 
+  # Helper method for printBoard, used in construction of board3
   def setPrintableBoard(self, board, x, y, char):
     if board[x][y] == '/':
       board[x][y] = char
@@ -171,6 +178,7 @@ class PartialSolution(Thread):
       board[x][y] = '+'
 
   def printBoard(self, simple=False):
+    global pieces
     # Board2 is reconstructed from the piece placement steps
     board2 = [[-1 for _ in range(self.board_w)] for __ in range(self.board_h)]
     x = y = 0
@@ -229,20 +237,29 @@ class PartialSolution(Thread):
     for line in board3:
       print ''.join(line)
 
+  # Done with helper functions, real code starts here
   def run(self):
     while True:
+      from Queue import Empty
+      global q, pieces
       try:
-        from Queue import Empty
-        global q, pieces
         _cost, self = q.get(True, 1)
         self.cost = _cost
       except Empty:
+        if DEBUG:
+          print 'Queue empty'
         return
+      if DEBUG:
+        self.debug()
       global maxCost
       if self.cost > maxCost and maxCost != -1:
+        if DEBUG:
+          print 'cost', self.cost,' > maxCost', maxCost
         continue
       # Completed solution, since all pieces are placed
       if len(self.pieces) == len(self.steps):
+        if DEBUG:
+          print '(complete solution)'
         global solutions
         if len(solutions) == 0:
           maxCost = self.cost
@@ -250,73 +267,121 @@ class PartialSolution(Thread):
         if len(solutions) == MAXSOLNS:
           return
         solutions.append(self)
-        if len(solutions) == MAXSOLNS: # Allows the -1/0 logic below.
+        if len(solutions) == MAXSOLNS: # Allows the -1/0 maxSolutions logicbelow.
           return
         q.task_done()
         continue
 
-      # Locating the first available space
       for self.x, self.y in doubleIter(self.board_h, self.board_w, start=(self.x, self.y)):
         if not self.getBoard(self.x, self.y):
           break
+      if DEBUG:
+        print 'First free space (x,y):', self.x, self.y
       self.attempted_pieces = []
       for rotation in range(0, 4):
         for pieceNum in range(len(self.pieces)):
-          if self.pieces[pieceNum] == None:
-            continue
-          pieceName, initialRotation = self.pieces[pieceNum]
-          offset, piece = tetrominos[(pieceName, (initialRotation+rotation) % 4)]
-          if piece == 'Invalid': # For pieces like the O which cannot be rotated further
-            continue
-          # Avoiding duplicates
-          if (pieceName, (initialRotation+rotation) % 4) in self.attempted_pieces:
-            continue
-          self.attempted_pieces.append((pieceName, (initialRotation+rotation) % 4))
-          newSolution = self.clone()
-          # T pieces have a kind of parity. Consider the board to be a checkerboard,
-          # then a T piece covers 3 black and 1 white squares, whereas all other pieces
-          # cover 2 and 2. Thus, you must have an even number of T pieces AND
-          # exactly half must be placed on white and half on black.
-          if pieceName == 'T':
-            parity = (self.x+self.y) % 2
-            if self.parity[parity] == 0:
-              continue # This piece would cause >50% of the pieces to be of this type.
-            newSolution.parity[parity] -= 1
+          try:
+            if self.pieces[pieceNum] == None:
+              continue
+            pieceName, initialRotation = self.pieces[pieceNum]
+            offset, piece = tetrominos[(pieceName, (initialRotation+rotation) % 4)]
+            if piece == 'Invalid': # For pieces like the O which cannot be rotated further
+              continue
+            # Avoiding duplicates
+            if (pieceName, (initialRotation+rotation) % 4) in self.attempted_pieces:
+              continue
+            self.attempted_pieces.append((pieceName, (initialRotation+rotation) % 4))
+            newSolution = self.clone()
 
-          invalidPlacement = False
-          for i, j in doubleIter(len(piece), len(piece[0])):
-            if piece[i][j] == 1:
-              # Bounds check and Collision
-              if self.isInvalid(self.x+i, self.y+j-offset):
-                invalidPlacement = True
-                break
-              newSolution.setBoard(self.x+i, self.y+j-offset)
-          if invalidPlacement:
-            continue
-          # Checking for 1x1 holes in the next row is inefficient, as it happens very rarely (1-2%).
-          # if self.x < self.board_h:
-          #   for j in range(1, self.board_w-1):
-          #     if (self.getBoard(self.x+1, j-1), self.getBoard(self.x+1, j), self.getBoard(self.x+1, j+1)) == (True, False, True):
-          #       if self.isInvalid(self.x+2, j):
-          #           invalidPlacement = True
-          #           break
-          if len(piece[0]) + self.y == self.board_h: # Piece placed touches the end of the board
-            spaces = 0
-            i = 0
-            while not self.getBoard(i, self.board_h-1) and i < self.board_w:
-              spaces += 1
-              i += 1
-            for j in range(i):
-              if not self.getBoard(i, self.board_h-2):
-                spaces += 1
-            if spaces%4 != 0:
-              continue # Impossible to fill remaining gap.
-          newSolution.uuid = getUUID()
-          newSolution.pieces[pieceNum] = None
-          newSolution.steps.append((pieceNum, rotation))
-          if rotation != 0: # First rotation is free because you can right-click the piece
-            rotation -= 1
-          q.put((self.cost + rotation, newSolution))
+            if DEBUG:
+              print 'Attempting to place piece', pieceName, 'with rotation', (initialRotation+rotation)%4
+              invalid = False
+
+            # Now we start checking for invalid states.
+            # First check: Bounds and collision. (68.6% hitrate)
+            # Additionally, we start filling in the new board.
+            for i, j in doubleIter(len(piece), len(piece[0])):
+              if piece[i][j] == 1:
+                # Bounds check and Collision
+                if self.isInvalid(self.x+i, self.y+j-offset):
+                  if DEBUG:
+                    print 'Failed check #1'
+                    checks[0] += 1
+                  raise StopIteration
+                newSolution.setBoard(self.x+i, self.y+j-offset)
+
+            # Second check: 1x1 holes in the next row. (8.31% hitrate)
+            # Also checks L placements against the side of the board.
+            for i in range(self.x, self.x+len(piece)):
+              for j in range(self.board_w):
+                if not newSolution.getBoard(i, j): # A potential gap
+                  if newSolution.isInvalid(i, j-1) and newSolution.isInvalid(i, j+1) and newSolution.isInvalid(i+1, j):
+                    if DEBUG:
+                      print 'Failed check #2'
+                      checks[1] += 1
+                      invalid = True
+                    else:
+                      raise StopIteration
+
+            # Third check: Uneven parity in the last row(s). (7.61% hitrate)
+            # If the piece touches the edge of the board,
+            # then it divides the remaining space into two parts.
+            # Each part must be a multiple of 4, or else it can't be filled by tetrominos.
+            if len(piece) + self.x == self.board_h: # Piece placed touches the end of the board
+              # Looking through columns until we find a filled one
+              spaces = 0
+              for j in range(self.board_w):
+                fullCol = True
+                for i in range(self.x+1, self.board_h):
+                  if not newSolution.getBoard(i, j): # Empty cell
+                    spaces += 1
+                    fullCol = False
+                if fullCol:
+                  if spaces%4 != 0:
+                    if DEBUG:
+                      print 'Failed check #3'
+                      checks[2] += 1
+                      invalid = True
+                    else:
+                      raise StopIteration
+
+            # Fourth check: T-tetromino parity. (0.51% hitrate)
+            # Consider the board to be a checkerboard,
+            # then a T piece covers 3 black and 1 white squares, whereas all other pieces
+            # cover 2 and 2. Thus, you must have an even number of T pieces AND
+            # exactly half must be placed on white and half on black.
+            if pieceName == 'T':
+              parity = (self.x+self.y) % 2
+              if self.parity[parity] == 0:
+                if DEBUG:
+                  print 'Failed check #4'
+                  checks[3] += 1
+                  invalid = True
+                else:
+                  raise StopIteration
+              newSolution.parity[parity] -= 1
+
+            if DEBUG and invalid:
+              raise StopIteration
+
+            # Passed all checks
+            if DEBUG:
+              print 'Success, added', newSolution.uuid, 'to queue.'
+            newSolution.pieces[pieceNum] = None
+            newSolution.steps.append((pieceNum, rotation))
+
+            if rotation == 0:
+              cost = 0
+            elif rotation == 1:
+              cost = 0 # First rotation is free because you can right-click the piece
+            elif rotation == 2:
+              cost = 1
+            elif rotation == 3:
+              cost = 2.1 # Rotating 3 times once is more expensive than 2 times twice.
+            if self.cost + cost <= maxCost or maxCost == -1:
+              q.put((self.cost + cost, newSolution))
+          except StopIteration:
+            pass
       q.task_done()
 
 def randomChallenge(x, y):
@@ -338,6 +403,8 @@ def solve(challenges, NUMTHREADS, _MAXSOLNS, benchmark=False):
   from Queue import PriorityQueue
   from time import time
   timeData = [[0, 0.0], [0, 0.0]]
+  if DEBUG:
+    NUMTHREADS = 1
 
   global uuid, maxCost, solutions, pieces
   uuid = 0
@@ -363,7 +430,6 @@ def solve(challenges, NUMTHREADS, _MAXSOLNS, benchmark=False):
     threads = []
     for i in range(NUMTHREADS):
       thread = PartialSolution()
-      thread.daemon = True # Allows for ^C to kill threads
       threads.append(thread)
       thread.start()
     for thread in threads:
@@ -371,6 +437,7 @@ def solve(challenges, NUMTHREADS, _MAXSOLNS, benchmark=False):
     runtime = time()-startTime
     print 'Took {time} seconds using {partials} partials.'.format(time=runtime, partials = uuid)
     print 'Found {num} solution{s} with {cost} rotations.'.format(num=len(solutions), s=('s' if len(solutions) != 1 else ''), cost=maxCost)
+    print
     if len(solutions) == 0:
       timeData[1][0] += 1
       timeData[1][1] += runtime
@@ -396,23 +463,25 @@ if __name__ == "__main__":
   challenges = {
     # 'Name': ['Pieces', Height, Width],
     'Connector':  ['T0, T0, L1', 3, 4], # 1
-    'A':          ['I1, L1, J1, Z0', 4, 4], # 0
     'Cube':       ['T0, T0, L1, Z0', 4, 4], # 1
-    'Floor 1':    ['L1, Z0, L1, Z0', 4, 4], # 1
-    'Recorder':   ['T0, T0, J1, S0, Z0', 5, 4], # 1
-    'Fan':        ['T0, T0, L1, S0, Z0', 5, 4], # 3
+    'Fan':        ['T0, T0, L1, S0, Z0', 5, 4], # 1
+    'Recorder':   ['T0, T0, J1, S0, Z0', 5, 4], # 0
+    'Platform':   ['I1, S0, T0, T0, L1, Z0', 6, 4], # 1
+    'A':          ['I1, L1, J1, Z0', 4, 4], # 0
     'B':          ['I1, T0, T0, L1, Z0', 5, 4], # 1
     'C':          ['T0, T0, J1, J1, L1, Z0', 6, 4], # 0
-    'Platform':   ['I1, S0, T0, T0, L1, Z0', 6, 4], # 1
-    'Floor 6':    ['O0, S0, S0, S0, S0, L0, L0, L0, L0', 6, 6], # 3
-    'Floor 2':    ['O0, T0, T0, T0, T0, L1, L1, L1, L1', 6, 6], # 2
     'A star':     ['T0, T0, T0, T0, L1, J1, S0, S0, Z0, Z0', 5, 8], # 1
     'B star':     ['I1, I1, O0, T0, T0, T0, T0, L1, L1, J1', 5, 8], # 1
-    'C star':     ['L1, J1, S0, Z0, T0, T0, I1, I1, O0, O0', 5, 8], # 1
+    'C star':     ['L1, J1, S0, Z0, T0, T0, I1, I1, O0, O0', 5, 8],
+    'Floor 1':    ['L1, Z0, L1, Z0', 4, 4], # 1
+    'Floor 2':    ['O0, T0, T0, T0, T0, L1, L1, L1, L1', 6, 6], # 3.1
     'Floor 3':    ['I1, I1, I1, I1, J1, J1, L1, L1, S0, Z0', 5, 8], # 0
     'Floor 4':    ['O0, O0, T0, T0, T0, T0, J1, L1, S0, S0, Z0, Z0', 8, 6], # 1
     'Floor 5':    ['I1, I1, O0, O0, O0, O0, T0, T0, T0, T0, J1, L1, S0, Z0', 7, 8], # 0
+    'Floor 6':    ['O0, S0, S0, S0, S0, L0, L0, L0, L0', 6, 6], # 3.1
     'DLC Silver': ['I1, T0, T0, L1, L1, J1, J1', 4, 7], # 1
-    'DLC Gold':   ['T0, S0, S0, T0, T0, I1, S0, I1, T0, L1', 8, 5], # 3
+    'DLC Gold':   ['T0, S0, S0, T0, T0, I1, S0, I1, T0, L1', 8, 5], # 3.1
   }
-  solve(challenges, 16, -1)
+  solve(challenges, 16, 0)
+  if DEBUG:
+    print checks
