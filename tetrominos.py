@@ -298,7 +298,7 @@ class PartialSolution(Thread):
               invalid = False
 
             # Now we start checking for invalid states.
-            # First check: Bounds and collision. (68.6% hitrate)
+            # First check: Bounds and collision. (68% hitrate)
             # Additionally, we start filling in the new board.
             for i, j in doubleIter(len(piece), len(piece[0])):
               if piece[i][j] == 1:
@@ -310,7 +310,7 @@ class PartialSolution(Thread):
                   raise StopIteration
                 newSolution.setBoard(self.x+i, self.y+j-offset)
 
-            # Second check: 1x1 holes in the next row. (8.31% hitrate)
+            # Second check: 1x1 holes in the next row. (8.2% hitrate)
             # Also checks L placements against the side of the board.
             for i in range(self.x, self.x+len(piece)):
               for j in range(self.board_w):
@@ -323,7 +323,7 @@ class PartialSolution(Thread):
                     else:
                       raise StopIteration
 
-            # Third check: Uneven parity in the last row(s). (7.61% hitrate)
+            # Third check: Uneven parity in the last row(s). (7% hitrate)
             # If the piece touches the edge of the board,
             # then it divides the remaining space into two parts.
             # Each part must be a multiple of 4, or else it can't be filled by tetrominos.
@@ -332,7 +332,7 @@ class PartialSolution(Thread):
               spaces = 0
               for j in range(self.board_w):
                 fullCol = True
-                for i in range(self.x+1, self.board_h):
+                for i in range(self.x, self.board_h):
                   if not newSolution.getBoard(i, j): # Empty cell
                     spaces += 1
                     fullCol = False
@@ -345,7 +345,7 @@ class PartialSolution(Thread):
                     else:
                       raise StopIteration
 
-            # Fourth check: T-tetromino parity. (0.51% hitrate)
+            # Fourth check: T-tetromino parity. (0.55% hitrate)
             # Consider the board to be a checkerboard,
             # then a T piece covers 3 black and 1 white squares, whereas all other pieces
             # cover 2 and 2. Thus, you must have an even number of T pieces AND
@@ -472,9 +472,9 @@ if __name__ == "__main__":
     'C':          ['T0, T0, J1, J1, L1, Z0', 6, 4], # 0
     'A star':     ['T0, T0, T0, T0, L1, J1, S0, S0, Z0, Z0', 5, 8], # 1
     'B star':     ['I1, I1, O0, T0, T0, T0, T0, L1, L1, J1', 5, 8], # 1
-    'C star':     ['L1, J1, S0, Z0, T0, T0, I1, I1, O0, O0', 5, 8],
+    'C star':     ['L1, J1, S0, Z0, T0, T0, I1, I1, O0, O0', 5, 8], # 1
     'Floor 1':    ['L1, Z0, L1, Z0', 4, 4], # 1
-    'Floor 2':    ['O0, T0, T0, T0, T0, L1, L1, L1, L1', 6, 6], # 3.1
+    'Floor 2':    ['O0, T0, T0, T0, T0, L1, L1, L1, L1', 6, 6], # 2
     'Floor 3':    ['I1, I1, I1, I1, J1, J1, L1, L1, S0, Z0', 5, 8], # 0
     'Floor 4':    ['O0, O0, T0, T0, T0, T0, J1, L1, S0, S0, Z0, Z0', 8, 6], # 1
     'Floor 5':    ['I1, I1, O0, O0, O0, O0, T0, T0, T0, T0, J1, L1, S0, Z0', 7, 8], # 0
