@@ -30,7 +30,9 @@ if (host == 'twitch') {
 		var parts = query.slice(1).split('&');
 		for (var p=0; p<parts.length; p++) {
 			if (parts[p].substring(0, 2) == 'v=') {
-				redirect('www.youtube.com/embed/'+parts[p].substring(2)+'?'+query.slice(1));
+				var videoId = parts.splice(p, 1);
+				var videoId = parts.splice(p, 1).join('').substring(2);
+				redirect('http://www.youtube.com/embed/'+videoId+'?'+parts.join('&'));
 			}
 		}
 	}
