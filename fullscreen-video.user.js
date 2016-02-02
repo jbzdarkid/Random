@@ -8,7 +8,8 @@
 // ==/UserScript==
 
 function redirect(url) {
-	document.head.innerHTML += '\n<meta http-equiv="refresh" content="0; url='+url+'">';
+	console.log('Full-browser video redirecting to '+url);
+	window.location.replace('\n<meta http-equiv="refresh" content="0; url='+url+'">');
 }
 
 var path = window.location.pathname.split('/');
@@ -22,7 +23,7 @@ if (host == 'twitch') {
 	if (path.length == 2) { // Viewing a channel
 		redirect('http://player.twitch.tv/?branding=false&showInfo=false&channel='+path[1]);
 	} else if (path.length == 4 && path[2] == 'v') { // Viewing a twitch vod
-		redirect'http://player.twitch.tv/?branding=false&showInfo=false&video='+path[2]+path[3]);
+		redirect('http://player.twitch.tv/?branding=false&showInfo=false&video='+path[2]+path[3]);
 	}
 } else if (host == 'youtube') {
 	if (path[1] == 'watch') { // Watching a youtube video
