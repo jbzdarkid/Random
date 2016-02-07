@@ -19,6 +19,7 @@ banned_connections = {
 	(4,0):(5,0),
 	(5,0):(4,0)
 }
+interesting_points = [(2, 0), (3, 1), (0, 2), (0, 3), (5, 2), (5, 3), (0, 1), (5, 1)]
 
 global uuidlock
 uuidlock = Lock()
@@ -65,12 +66,17 @@ class PartialSolution(Thread):
     ))
 
   def debug(self):
-    global longest
+    global longest, startTime
     if len(self.history) > longest:
       longest = len(self.history)
+      print time()-startTime
       print self.uuid, len(self.history), self.history
+    # if self.blue_path == [(3, 4), (4, 4), (5, 4), (6, 4), (6, 3), (6, 2), (5, 2), (5, 3), (4, 3), (3, 3), (2, 3), (2, 4), (1, 4), (1, 3), (1, 2), (1, 1), (0, 1), (0, 0)]:
+      # print 1, self.uuid
+      # if self.orange_path == [(3, 0), (2, 0), (2, 1), (3, 1), (3, 2), (4, 2), (4, 1), (5, 1), (5, 0), (6, 0)]:
+        # print 2, self.uuid
 
-  # Check if a square is contiguous to a square in the given direction.
+  # Check if a square is contiguous to another square in the given direction.
   def isConnected(self, square, dir):
     x, y = square
     if dir == 'left':
@@ -246,7 +252,6 @@ class PartialSolution(Thread):
       except Empty:
         return
       self.debug()
-      # raw_input()
       if self.color == 'blue':
         head = self.blue_path[-1]
         # Reached the exit for the first time and the door is open
@@ -262,7 +267,7 @@ class PartialSolution(Thread):
             # If we haven't solved orange yet, we need to find that solution. Restart our blue path and keep looking
             newSolution.blue_path = [(3, 4)]
             q.put(newSolution)
-        elif head == (0, 0) or head == (6, 0):
+        elif head == (0, 0) or head == (6, 0) or head == (0, 4) or head == (6, 4):
           if self.isValidSolution():
             # The obvious choice is to then travel to the other side, and build a new path back
             newSolution = self.clone()
@@ -277,23 +282,63 @@ class PartialSolution(Thread):
               newSolution.history.append(['orange', (3, 0)])
               newSolution.orange_path = [(3, 0)]
               newSolution.blue_path = [(3, 4)]
-              q.put(newSolution)
-        if self.isValid(self.color, plus(head, (-1, 0))):
-          newSolution = self.clone()
-          newSolution.blue_path.append(plus(head, (-1, 0)))
-          q.put(newSolution)
-        if self.isValid(self.color, plus(head, (1, 0))):
-          newSolution = self.clone()
-          newSolution.blue_path.append(plus(head, (1, 0)))
-          q.put(newSolution)
-        if self.isValid(self.color, plus(head, (0, -1))):
-          newSolution = self.clone()
-          newSolution.blue_path.append(plus(head, (0, -1)))
-          q.put(newSolution)
-        if self.isValid(self.color, plus(head, (0, 1))):
-          newSolution = self.clone()
-          newSolution.blue_path.append(plus(head, (0, 1)))
-          q.put(newSolution)
+              # q.put(newSolution)
+        # Below are the possible ways to extend the path. Complexity arises because:
+        # 1. Steps forward should avoid forming loops (pictured in the comments, with o as the head and .. as the potential next step)
+        # 1a. Loops are OK when capturing an interesting point, such as a star or a square.
+        # 1b. Loops are OK when they hit the edge of the board, as this can divide stars.
+        # 2. Steps forward need to not collide with other paths (handled in isValid)
+        # 3. Steps forward need to be in bounds (handled in isValid)
+        # 4. Steps forward need to respect the breaks in the board (handled in isValid)
+
+        # o..  +--
+        # |    |
+        # +--  o..
+        if len(self.blue_path) < 3 or head[0] < 5 or (
+        (plus(head, (1, 1)) != self.blue_path[-3] or
+         plus(head, (0, 0)) in interesting_points) and
+        (plus(head, (1, -1)) != self.blue_path[-3] or
+         plus(head, (0, -1)) in interesting_points)):
+          if self.isValid(self.color, plus(head, (1, 0))):
+            newSolution = self.clone()
+            newSolution.blue_path.append(plus(head, (1, 0)))
+            q.put(newSolution)
+        # +-o  o-+
+        # | .  . |
+        # | .  . |
+        if len(self.blue_path) < 3 or head[1] < 3 or (
+        (plus(head, (-1, 1)) != self.blue_path[-3] or
+         plus(head, (-1, 0)) in interesting_points) and
+        (plus(head, (1, 1)) != self.blue_path[-3] or
+         plus(head, (0, 0)) in interesting_points)):
+          if self.isValid(self.color, plus(head, (0, 1))):
+            newSolution = self.clone()
+            newSolution.blue_path.append(plus(head, (0, 1)))
+            q.put(newSolution)
+        # --+  ..o
+        #   |    |
+        # ..o  --+
+        if len(self.blue_path) < 3 or head[0] > 1 or (
+        (plus(head, (-1, -1)) != self.blue_path[-3] or
+         plus(head, (-1, -1)) in interesting_points) and
+        (plus(head, (-1, 1)) != self.blue_path[-3] or
+         plus(head, (-1, 0)) in interesting_points)):
+          if self.isValid(self.color, plus(head, (-1, 0))):
+            newSolution = self.clone()
+            newSolution.blue_path.append(plus(head, (-1, 0)))
+            q.put(newSolution)
+        # . |  | .
+        # . |  | .
+        # o-+  +-o
+        if len(self.blue_path) < 3 or head[1] > 1 or (
+        (plus(head, (1, -1)) != self.blue_path[-3] or
+         plus(head, (0, -1)) in interesting_points) and
+        (plus(head, (-1, -1)) != self.blue_path[-3] or
+         plus(head, (-1, -1)) in interesting_points)):
+          if self.isValid(self.color, plus(head, (0, -1))):
+            newSolution = self.clone()
+            newSolution.blue_path.append(plus(head, (0, -1)))
+            q.put(newSolution)
       elif self.color == 'orange':
         head = self.orange_path[-1]
         # Reached the exit for the first time and the door is open
@@ -309,7 +354,7 @@ class PartialSolution(Thread):
             # If we haven't solved blue yet, we need to find that solution. Restart our orange path and keep looking
             newSolution.orange_path = [(3, 0)]
             q.put(newSolution)
-        elif head == (0, 4) or head == (6, 4):
+        elif head == (0, 0) or head == (6, 0) or head == (0, 4) or head == (6, 4):
           if self.isValidSolution():
             # The obvious choice is to then travel to the other side, and build a new path back
             newSolution = self.clone()
@@ -319,28 +364,60 @@ class PartialSolution(Thread):
             q.put(newSolution)
             # The non-obvious choice is to travel to the other side, RESET THE PATH there, and then make another orange solution. This is potentially useful at any time.
             newSolution = self.clone()
-            newSolution.color = 'blue'
             newSolution.history.append(['orange']+newSolution.orange_path)
             newSolution.history.append(['blue', (3, 4)])
             newSolution.orange_path = [(3, 0)]
             newSolution.blue_path = [(3, 4)]
+            # q.put(newSolution)
+
+        # o..  +--
+        # |    |
+        # +--  o..
+        if len(self.orange_path) < 3 or (
+        (plus(head, (1, 1)) != self.orange_path[-3] or
+         plus(head, (0, 0)) in interesting_points) and
+        (plus(head, (1, -1)) != self.orange_path[-3] or
+         plus(head, (0, -1)) in interesting_points)):
+          if self.isValid(self.color, plus(head, (1, 0))):
+            newSolution = self.clone()
+            newSolution.orange_path.append(plus(head, (1, 0)))
             q.put(newSolution)
-        if self.isValid(self.color, plus(head, (-1, 0))):
-          newSolution = self.clone()
-          newSolution.orange_path.append(plus(head, (-1, 0)))
-          q.put(newSolution)
-        if self.isValid(self.color, plus(head, (1, 0))):
-          newSolution = self.clone()
-          newSolution.orange_path.append(plus(head, (1, 0)))
-          q.put(newSolution)
-        if self.isValid(self.color, plus(head, (0, -1))):
-          newSolution = self.clone()
-          newSolution.orange_path.append(plus(head, (0, -1)))
-          q.put(newSolution)
-        if self.isValid(self.color, plus(head, (0, 1))):
-          newSolution = self.clone()
-          newSolution.orange_path.append(plus(head, (0, 1)))
-          q.put(newSolution)
+        # +-o  o-+
+        # | .  . |
+        # | .  . |
+        if len(self.orange_path) < 3 or (
+        (plus(head, (-1, 1)) != self.orange_path[-3] or
+         plus(head, (-1, 0)) in interesting_points) and
+        (plus(head, (1, 1)) != self.orange_path[-3] or
+         plus(head, (0, 0)) in interesting_points)):
+          if self.isValid(self.color, plus(head, (0, 1))):
+            newSolution = self.clone()
+            newSolution.orange_path.append(plus(head, (0, 1)))
+            q.put(newSolution)
+        # --+  ..o
+        #   |    |
+        # ..o  --+
+        if len(self.orange_path) < 3 or (
+        (plus(head, (-1, -1)) != self.orange_path[-3] or
+         plus(head, (-1, -1)) in interesting_points) and
+        (plus(head, (-1, 1)) != self.orange_path[-3] or
+         plus(head, (-1, 0)) in interesting_points)):
+          if self.isValid(self.color, plus(head, (-1, 0))):
+            newSolution = self.clone()
+            newSolution.orange_path.append(plus(head, (-1, 0)))
+            q.put(newSolution)
+        # . |  | .
+        # . |  | .
+        # o-+  +-o
+        if len(self.orange_path) < 3 or (
+        (plus(head, (1, -1)) != self.orange_path[-3] or
+         plus(head, (0, -1)) in interesting_points) and
+        (plus(head, (-1, -1)) != self.orange_path[-3] or
+         plus(head, (-1, -1)) in interesting_points)):
+          if self.isValid(self.color, plus(head, (0, -1))):
+            newSolution = self.clone()
+            newSolution.orange_path.append(plus(head, (0, -1)))
+            q.put(newSolution)
       q.task_done()
 
 global uuid
@@ -354,8 +431,9 @@ longest = 0
 # Color, blue solved, orange solved, blue path, orange path, history, uuid
 q.put(PartialSolution(root=('blue', False, False, [(3, 4)], [(3, 0)], [], uuid)))
 threads = []
+global startTime
 startTime = time()
-for i in range(16): # Number of threads
+for i in range(1): # Number of threads
   thread = PartialSolution()
   threads.append(thread)
   thread.start()
