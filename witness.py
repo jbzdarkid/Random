@@ -65,19 +65,7 @@ class PartialSolution(Thread):
     ))
 
   def debug(self):
-    if self.uuid == 45050 or self.uuid == 176967:
-      print self.blue_path
-      self.isValidSolution(verbose=True)
-      raw_input()
-    if len(self.history) > 0:
-      print self.history
-      self.isValidSolution(verbose=True)
-      raw_input()
-      if self.history[:1][0][:10] == ['blue', (3, 4), (4, 4), (5, 4), (6, 4), (6, 3), (6, 2), (5, 2), (5, 3), (4, 3)]:
-        print 0, uuid, self.history
-      if self.history[:1] == [['blue', (3, 4), (4, 4), (5, 4), (6, 4), (6, 3), (6, 2), (5, 2), (5, 3), (4, 3), (3, 3), (2, 3), (2, 4), (1, 4), (1, 3), (1, 2), (1, 1), (0, 1), (0, 0)]]:
-        print 1, uuid, self.history
-        raw_input()
+    # uuid = 177102 is the first step in the given solution
     # print 'Color', self.color
     # print 'Blue:', self.blue_solved, 'Orange:', self.orange_solved
     # print 'Blue path:', self.blue_path
@@ -131,17 +119,17 @@ class PartialSolution(Thread):
         return False
       try:
         index = self.blue_path.index((x+1, y+1))
-        if index > 0 and self.blue_path[index-1] == (x, y-1):
+        if index > 0 and self.blue_path[index-1] == (x+1, y):
           return False
-        if index < len(self.blue_path)-1 and self.blue_path[index+1] == (x, y-1):
+        if index < len(self.blue_path)-1 and self.blue_path[index+1] == (x+1, y):
           return False
       except ValueError:
         pass
       try:
         index = self.orange_path.index((x+1, y+1))
-        if index > 0 and self.orange_path[index-1] == (x, y-1):
+        if index > 0 and self.orange_path[index-1] == (x+1, y):
           return False
-        if index < len(self.orange_path)-1 and self.orange_path[index+1] == (x, y-1):
+        if index < len(self.orange_path)-1 and self.orange_path[index+1] == (x+1, y):
           return False
       except ValueError:
         pass
@@ -150,17 +138,17 @@ class PartialSolution(Thread):
         return False
       try:
         index = self.blue_path.index((x+1, y+1))
-        if index > 0 and self.blue_path[index-1] == (x-1, y):
+        if index > 0 and self.blue_path[index-1] == (x, y+1):
           return False
-        if index < len(self.blue_path)-1 and self.blue_path[index+1] == (x-1, y):
+        if index < len(self.blue_path)-1 and self.blue_path[index+1] == (x, y+1):
           return False
       except ValueError:
         pass
       try:
         index = self.orange_path.index((x+1, y+1))
-        if index > 0 and self.orange_path[index-1] == (x-1, y):
+        if index > 0 and self.orange_path[index-1] == (x, y+1):
           return False
-        if index < len(self.orange_path)-1 and self.orange_path[index+1] == (x-1, y):
+        if index < len(self.orange_path)-1 and self.orange_path[index+1] == (x, y+1):
           return False
       except ValueError:
         pass
@@ -224,6 +212,8 @@ class PartialSolution(Thread):
       square = visit_list[j]
       # White square
       if square == (5, 1):
+        if verbose:
+          print 'Squares are connected'
         return False
       if self.isConnected(square, 'left'):
         if verbose:
@@ -265,7 +255,7 @@ class PartialSolution(Thread):
         self = q.get(True, 1)
       except Empty:
         return
-      self.debug()
+      # self.debug()
       # raw_input()
       if self.color == 'blue':
         head = self.blue_path[-1]
@@ -306,6 +296,7 @@ class PartialSolution(Thread):
           if self.isValidSolution():
             # Reached the exit! Orange is now solved.
             self.orange_solved = True
+            print 'Found orange path'
             self.history.append(['orange']+self.orange_path)
             if self.blue_solved:
               done = True
