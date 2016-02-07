@@ -65,13 +65,8 @@ class PartialSolution(Thread):
     ))
 
   def debug(self):
-    # uuid = 177102 is the first step in the given solution
-    print 'Color', self.color
-    print 'Blue:', self.blue_solved, 'Orange:', self.orange_solved
-    print 'Blue path:', self.blue_path
-    print 'Orange path:', self.orange_path
-    print 'UUID:', uuid
-    print self.isValidSolution(verbose=True)
+    if len(self.history) > 1:
+      print self.uuid, len(self.history), self.history
 
   # Check if a square is contiguous to a square in the given direction.
   def isConnected(self, square, dir):
@@ -240,40 +235,47 @@ class PartialSolution(Thread):
       print 'Valid solution found'
     return True
 
-  # TODO: Handle the following:
-  # Solve blue, go to orange
-  # Solve orange, go to blue
-  # Reset blue, go to orange
-  # Re-solve orange, go to blue
-  # Solve blue, exit
   def run(self):
-    global done
-    while not done:
+    while True:
       from Queue import Empty
       global q
       try:
         self = q.get(True, 1)
       except Empty:
         return
-      # self.debug()
+      self.debug()
       # raw_input()
       if self.color == 'blue':
         head = self.blue_path[-1]
-        if head == (0, 3) and len(self.orange_path) > 0:
-          if self.isValidSolution():
-            # Reached the exit! Blue is now solved.
-            self.blue_solved = True
-            self.history.append(['blue']+self.blue_path)
-            if self.orange_solved:
-              done = True
-              print uuid, self.history
-              return
-        elif head == (0, 0) or head == (6, 0):
+        # Reached the exit for the first time and the door is open
+        if head == (0, 3) and not self.blue_solved and len(self.orange_path) > 0:
           if self.isValidSolution():
             newSolution = self.clone()
+            newSolution.blue_solved = True
+            newSolution.history.append(['blue']+newSolution.blue_path)
+            if newSolution.orange_solved:
+              print 'Found solution at', uuid, self.history
+              q.task_done()
+              continue
+            # If we haven't solved orange yet, we need to find that solution. Restart our blue path and keep looking
+            newSolution.blue_path = [(3, 4)]
+            q.put(newSolution)
+        elif head == (0, 0) or head == (6, 0):
+          if self.isValidSolution():
+            # The obvious choice is to then travel to the other side, and build a new path back
+            newSolution = self.clone()
             newSolution.color = 'orange'
+            newSolution.history.append(['blue']+newSolution.blue_path)
             newSolution.orange_path = [(3, 0)]
             q.put(newSolution)
+            # The non-obvious choice is to travel to the other side, RESET THE PATH there, and then make another blue solution. The only time this is useful is if we've already solved one of the two sides.
+            if (self.blue_solved or self.orange_solved):
+              newSolution = self.clone()
+              newSolution.history.append(['blue']+newSolution.blue_path)
+              newSolution.history.append(['orange', (3, 0)])
+              newSolution.orange_path = [(3, 0)]
+              newSolution.blue_path = [(3, 4)]
+              q.put(newSolution)
         if self.isValid(self.color, plus(head, (-1, 0))):
           newSolution = self.clone()
           newSolution.blue_path.append(plus(head, (-1, 0)))
@@ -292,16 +294,35 @@ class PartialSolution(Thread):
           q.put(newSolution)
       elif self.color == 'orange':
         head = self.orange_path[-1]
-        if head == (0, 3) and len(self.orange_path) > 0:
+        # Reached the exit for the first time and the door is open
+        if head == (0, 3) and not self.orange_solved and len(self.blue_path) > 0:
           if self.isValidSolution():
-            # Reached the exit! Orange is now solved.
-            self.orange_solved = True
-            print 'Found orange path'
-            self.history.append(['orange']+self.orange_path)
-            if self.blue_solved:
-              done = True
-              print uuid, self.history
-              return
+            newSolution = self.clone()
+            newSolution.orange_solved = True
+            newSolution.history.append(['orange']+newSolution.orange_path)
+            if newSolution.blue_solved:
+              print 'Found solution at', uuid, newSolution.history
+              q.task_done()
+              continue
+            # If we haven't solved blue yet, we need to find that solution. Restart our orange path and keep looking
+            newSolution.orange_path = [(3, 0)]
+            q.put(newSolution)
+        elif head == (0, 0) or head == (6, 0):
+          if self.isValidSolution():
+            # The obvious choice is to then travel to the other side, and build a new path back
+            newSolution = self.clone()
+            newSolution.color = 'blue'
+            newSolution.history.append(['orange']+newSolution.orange_path)
+            newSolution.blue_path = [(3, 0)]
+            q.put(newSolution)
+            # The non-obvious choice is to travel to the other side, RESET THE PATH there, and then make another orange solution. This is potentially useful at any time.
+            newSolution = self.clone()
+            newSolution.color = 'blue'
+            newSolution.history.append(['orange']+newSolution.orange_path)
+            newSolution.history.append(['blue', (3, 4)])
+            newSolution.orange_path = [(3, 0)]
+            newSolution.blue_path = [(3, 4)]
+            q.put(newSolution)
         elif head == (0, 4) or head == (6, 4):
           if self.isValidSolution():
             newSolution = self.clone()
