@@ -66,12 +66,12 @@ class PartialSolution(Thread):
 
   def debug(self):
     # uuid = 177102 is the first step in the given solution
-    # print 'Color', self.color
-    # print 'Blue:', self.blue_solved, 'Orange:', self.orange_solved
-    # print 'Blue path:', self.blue_path
-    # print 'Orange path:', self.orange_path
-    # print 'UUID:', uuid
-    # print self.isValidSolution(verbose=True)
+    print 'Color', self.color
+    print 'Blue:', self.blue_solved, 'Orange:', self.orange_solved
+    print 'Blue path:', self.blue_path
+    print 'Orange path:', self.orange_path
+    print 'UUID:', uuid
+    print self.isValidSolution(verbose=True)
 
   # Check if a square is contiguous to a square in the given direction.
   def isConnected(self, square, dir):
@@ -336,7 +336,7 @@ q = Queue()
 q.put(PartialSolution(root=('blue', False, False, [(3, 4)], [(3, 0)], [], uuid)))
 threads = []
 startTime = time()
-for i in range(1): # Number of threads
+for i in range(16): # Number of threads
   thread = PartialSolution()
   threads.append(thread)
   thread.start()
