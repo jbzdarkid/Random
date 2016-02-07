@@ -65,7 +65,9 @@ class PartialSolution(Thread):
     ))
 
   def debug(self):
-    if len(self.history) > 1:
+    global longest
+    if len(self.history) > longest:
+      longest = len(self.history)
       print self.uuid, len(self.history), self.history
 
   # Check if a square is contiguous to a square in the given direction.
@@ -248,7 +250,7 @@ class PartialSolution(Thread):
       if self.color == 'blue':
         head = self.blue_path[-1]
         # Reached the exit for the first time and the door is open
-        if head == (0, 3) and not self.blue_solved and len(self.orange_path) > 0:
+        if head == (0, 3) and not self.blue_solved and len(self.orange_path) > 1:
           if self.isValidSolution():
             newSolution = self.clone()
             newSolution.blue_solved = True
@@ -295,7 +297,7 @@ class PartialSolution(Thread):
       elif self.color == 'orange':
         head = self.orange_path[-1]
         # Reached the exit for the first time and the door is open
-        if head == (0, 3) and not self.orange_solved and len(self.blue_path) > 0:
+        if head == (0, 3) and not self.orange_solved and len(self.blue_path) > 1:
           if self.isValidSolution():
             newSolution = self.clone()
             newSolution.orange_solved = True
@@ -353,6 +355,8 @@ global done
 done = False
 global q
 q = Queue()
+global longest
+longest = 0
 # Color, blue solved, orange solved, blue path, orange path, history, uuid
 q.put(PartialSolution(root=('blue', False, False, [(3, 4)], [(3, 0)], [], uuid)))
 threads = []
