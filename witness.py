@@ -65,7 +65,14 @@ class PartialSolution(Thread):
     ))
 
   def debug(self):
+    if self.uuid == 45050 or self.uuid == 176967:
+      print self.blue_path
+      self.isValidSolution(verbose=True)
+      raw_input()
     if len(self.history) > 0:
+      print self.history
+      self.isValidSolution(verbose=True)
+      raw_input()
       if self.history[:1][0][:10] == ['blue', (3, 4), (4, 4), (5, 4), (6, 4), (6, 3), (6, 2), (5, 2), (5, 3), (4, 3)]:
         print 0, uuid, self.history
       if self.history[:1] == [['blue', (3, 4), (4, 4), (5, 4), (6, 4), (6, 3), (6, 2), (5, 2), (5, 3), (4, 3), (3, 3), (2, 3), (2, 4), (1, 4), (1, 3), (1, 2), (1, 1), (0, 1), (0, 0)]]:
@@ -78,86 +85,167 @@ class PartialSolution(Thread):
     # print 'UUID:', uuid
     # print self.isValidSolution(verbose=True)
 
+  # Check if a square is contiguous to a square in the given direction.
+  def isConnected(self, square, dir):
+    x, y = square
+    if dir == 'left':
+      if x == 0:
+        return False
+      try:
+        index = self.blue_path.index((x, y))
+        if index > 0 and self.blue_path[index-1] == (x, y+1):
+          return False
+        if index < len(self.blue_path)-1 and self.blue_path[index+1] == (x, y+1):
+          return False
+      except ValueError:
+        pass
+      try:
+        index = self.orange_path.index((x, y))
+        if index > 0 and self.orange_path[index-1] == (x, y+1):
+          return False
+        if index < len(self.orange_path)-1 and self.orange_path[index+1] == (x, y+1):
+          return False
+      except ValueError:
+        pass
+    elif dir == 'up':
+      if y == 0:
+        return False
+      try:
+        index = self.blue_path.index((x, y))
+        if index > 0 and self.blue_path[index-1] == (x+1, y):
+          return False
+        if index < len(self.blue_path)-1 and self.blue_path[index+1] == (x+1, y):
+          return False
+      except ValueError:
+        pass
+      try:
+        index = self.orange_path.index((x, y))
+        if index > 0 and self.orange_path[index-1] == (x+1, y):
+          return False
+        if index < len(self.orange_path)-1 and self.orange_path[index+1] == (x+1, y):
+          return False
+      except ValueError:
+        pass
+    elif dir == 'right':
+      if x == 5:
+        return False
+      try:
+        index = self.blue_path.index((x+1, y+1))
+        if index > 0 and self.blue_path[index-1] == (x, y-1):
+          return False
+        if index < len(self.blue_path)-1 and self.blue_path[index+1] == (x, y-1):
+          return False
+      except ValueError:
+        pass
+      try:
+        index = self.orange_path.index((x+1, y+1))
+        if index > 0 and self.orange_path[index-1] == (x, y-1):
+          return False
+        if index < len(self.orange_path)-1 and self.orange_path[index+1] == (x, y-1):
+          return False
+      except ValueError:
+        pass
+    elif dir == 'down':
+      if y == 3:
+        return False
+      try:
+        index = self.blue_path.index((x+1, y+1))
+        if index > 0 and self.blue_path[index-1] == (x-1, y):
+          return False
+        if index < len(self.blue_path)-1 and self.blue_path[index+1] == (x-1, y):
+          return False
+      except ValueError:
+        pass
+      try:
+        index = self.orange_path.index((x+1, y+1))
+        if index > 0 and self.orange_path[index-1] == (x-1, y):
+          return False
+        if index < len(self.orange_path)-1 and self.orange_path[index+1] == (x-1, y):
+          return False
+      except ValueError:
+        pass
+    return True
+
   def isValidSolution(self, verbose=False):
-    # If any corner around a star is included in a region, the star is included in that region.
-    stars = [
-      [(2, 0), (2, 1), (3, 0), (3, 1)],
-      [(3, 1), (3, 2), (4, 1), (4, 2)],
-      [(0, 2), (0, 3), (1, 2), (1, 3)],
-      [(0, 3), (0, 4), (1, 3), (1, 4)],
-      [(5, 2), (5, 3), (6, 2), (6, 3)],
-      [(5, 3), (5, 4), (6, 3), (6, 4)]
-    ]
+    # For region definitions, we use square centers rather than square corners. The range for stars is thus [0-5, 0-3]
+    stars = [(2, 0), (3, 1), (0, 2), (0, 3), (5, 2), (5, 3)]
     for i in range(3): # There are 6 stars, and each time we find one it needs to remove exactly 1 other star.
-      visited = {}
-      to_visit = stars.pop()
+      pair_star = None
+      visit_list = [stars.pop()]
       if verbose:
-        print 'Iteration', i, 'selected star:', to_visit
-      while len(to_visit) > 0:
-        square = to_visit.pop()
-        if square in visited:
-          continue
-        # Regions are contiguous over line breaks, so no color spec.
-        if self.isValid('none', square):
-          visited[square] = True
-          to_visit += [
-            plus(square, (-1, 0)),
-            plus(square, (1, 0)),
-            plus(square, (0, -1)),
-            plus(square, (0, 1))
-          ]
-        else:
-          visited[square] = False
+        print 'Iteration', i, 'selected star:', visit_list
+      j = 0
+      while j < len(visit_list):
+        square = visit_list[j]
+        if square in stars:
+          if pair_star is not None:
+            if verbose:
+              print 'Tried to remove 2 stars in one region'
+            return False
+          pair_star = square
+          if verbose:
+            print 'Found pair star:', square
+        if self.isConnected(square, 'left'):
+          if verbose:
+            print square, 'is connected to the left'
+          if plus(square, (-1, 0)) not in visit_list:
+            visit_list.append(plus(square, (-1, 0)))
+        if self.isConnected(square, 'up'):
+          if verbose:
+            print square, 'is connected up'
+          if plus(square, (0, -1)) not in visit_list:
+            visit_list.append(plus(square, (0, -1)))
+        if self.isConnected(square, 'right'):
+          if verbose:
+            print square, 'is connected to the right'
+          if plus(square, (1, 0)) not in visit_list:
+            visit_list.append(plus(square, (1, 0)))
+        if self.isConnected(square, 'down'):
+          if verbose:
+            print square, 'is connected down'
+          if plus(square, (0, 1)) not in visit_list:
+            visit_list.append(plus(square, (0, 1)))
+        j += 1
       if verbose:
-        print 'Done visiting, continguous region:', to_visit
-      new_stars = []
-      for star in stars:
-        if star[0] in visited and visited[star[0]]:
-          continue
-        if star[1] in visited and visited[star[1]]:
-          continue
-        if star[2] in visited and visited[star[2]]:
-          continue
-        if star[3] in visited and visited[star[3]]:
-          continue
-        new_stars.append(star)
-      if len(new_stars) != len(stars) - 1:
-        return False # Removed more or less than 1 other star
-      if verbose:
-        print len(new_stars), 'new stars:', new_stars
-      stars = new_stars
-    # All stars verified, now check the squares
+        print 'Done visiting, contiguous region:', visit_list
+      if pair_star is None:
+        if verbose:
+          print 'Only 1 star in region'
+        return False
+      stars.remove(pair_star)
+    # All stars verified, now check the colored squares
     if verbose:
       print 'Valid solution with stars found'
 
-    white_square = [(5, 1), (5, 2), (6, 1), (6, 2)]
     # Black square
-    to_visit = [(0, 1), (0, 2), (1, 1), (1, 2)]
-    visited = {}
-    while len(to_visit) > 0:
-      square = to_visit.pop()
-      if square in visited:
-        continue
-      # Regions are contiguous over line breaks, so no color spec.
-      if self.isValid('none', square):
-        visited[square] = True
-        to_visit += [
-          plus(square, (-1, 0)),
-          plus(square, (1, 0)),
-          plus(square, (0, -1)),
-          plus(square, (0, 1))
-        ]
-      else:
-        visited[square] = False
-    if white_square[0] in visited and visited[white_square[0]]:
-      return False
-    if white_square[1] in visited and visited[white_square[1]]:
-      return False
-    if white_square[2] in visited and visited[white_square[2]]:
-      return False
-    if white_square[3] in visited and visited[white_square[3]]:
-      return False
-
+    visit_list = [(0, 1)]
+    j = 0
+    while j < len(visit_list):
+      square = visit_list[j]
+      # White square
+      if square == (5, 1):
+        return False
+      if self.isConnected(square, 'left'):
+        if verbose:
+          print square, 'is connected to the left'
+        if plus(square, (-1, 0)) not in visit_list:
+          visit_list.append(plus(square, (-1, 0)))
+      if self.isConnected(square, 'up'):
+        if verbose:
+          print square, 'is connected up'
+        if plus(square, (0, -1)) not in visit_list:
+          visit_list.append(plus(square, (0, -1)))
+      if self.isConnected(square, 'right'):
+        if verbose:
+          print square, 'is connected to the right'
+        if plus(square, (1, 0)) not in visit_list:
+          visit_list.append(plus(square, (1, 0)))
+      if self.isConnected(square, 'down'):
+        if verbose:
+          print square, 'is connected down'
+        if plus(square, (0, 1)) not in visit_list:
+          visit_list.append(plus(square, (0, 1)))
+      j += 1
     if verbose:
       print 'Valid solution found'
     return True
