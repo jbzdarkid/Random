@@ -309,7 +309,7 @@ class PartialSolution(Thread):
             # If we haven't solved blue yet, we need to find that solution. Restart our orange path and keep looking
             newSolution.orange_path = [(3, 0)]
             q.put(newSolution)
-        elif head == (0, 0) or head == (6, 0):
+        elif head == (0, 4) or head == (6, 4):
           if self.isValidSolution():
             # The obvious choice is to then travel to the other side, and build a new path back
             newSolution = self.clone()
@@ -323,12 +323,6 @@ class PartialSolution(Thread):
             newSolution.history.append(['orange']+newSolution.orange_path)
             newSolution.history.append(['blue', (3, 4)])
             newSolution.orange_path = [(3, 0)]
-            newSolution.blue_path = [(3, 4)]
-            q.put(newSolution)
-        elif head == (0, 4) or head == (6, 4):
-          if self.isValidSolution():
-            newSolution = self.clone()
-            newSolution.color = 'blue'
             newSolution.blue_path = [(3, 4)]
             q.put(newSolution)
         if self.isValid(self.color, plus(head, (-1, 0))):
