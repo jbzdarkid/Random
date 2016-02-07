@@ -20,14 +20,16 @@ class PartialSolution(Thread):
     super(PartialSolution, self).__init__()
 
   def clone(self):
-    return PartialSolution(root=(getUUID()))
+    return PartialSolution(root=(
+    	getUUID()
+    ))
 
   def run(self):
     while True:
       from Queue import Empty
       global q
       try:
-        self = q.get(True, 1)
+        self = q.get(True, 1) # Solutions can potentially go through a bottleneck. If this happens, the queue might run dry breifly. I don't want threads to close during this time.
       except Empty:
         return
       if self.uuid >= 100:
