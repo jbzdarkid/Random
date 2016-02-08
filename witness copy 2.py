@@ -5,20 +5,18 @@ from time import time
 from copy import copy
 
 # Add two tuples together. Credit http://stackoverflow.com/questions/497885/python-element-wise-tuple-operations-like-sum
-def plus(a, b):
-  import operator
-  return tuple(map(operator.add, a, b))
+def plus(a, b, c):
+  return (a[0]+b, a[1]+c)
 
-# The puzzle grid is a 7x5, so indices range from [0-6][0-3].
+# The puzzle grid is a 7x5, so indices range from [0-6][0-4].
 banned_connections = {
-	(0,2):(0,3),
-	(0,3):(0,2),
-	(0,3):(0,4),
-	(0,4):(0,3),
-	(1,0):(2,0),
-	(2,0):(1,0),
-	(4,0):(5,0),
-	(5,0):(4,0)
+  (0,2):['down'],
+  (0,3):['up', 'down'],
+  (0,4):['up'],
+  (1,0):['right'],
+  (2,0):['left'],
+  (4,0):['right'],
+  (5,0):['left']
 }
 
 global uuidlock
@@ -50,30 +48,96 @@ class PartialSolution(Thread):
       return
     super(PartialSolution, self).__init__()
 
-  def __eq__(self, other):
-    if self.blue_path != other.blue_path:
+  # Checks if a path is valid. Considerations are:
+  # 1. Steps forward should avoid forming loops (pictured in the comments, with o as the head and .. as the potential next step)
+  # 1a. Loops are OK when capturing an interesting point, such as a star or a square.
+  # 1b. Loops are OK when they hit the edge of the board, as this can divide stars.
+  # 2. Steps forward need to not collide with other paths
+  # 3. Steps forward need to be in bounds
+  # 4. Steps forward need to respect the breaks in the board
+  def isValidConnection(self, dir):
+    if self.color == 'blue' and len(self.blue_path) > 2:
+      head = self.blue_path[-1]
+      head2 = self.blue_path[-3]
+    if self.color == 'orange' and len(self.orange_path) > 2:
+      head = self.orange_path[-1]
+      head2 = self.orange_path[-3]
+    if head in banned_connections and dir in banned_connections[head]:
       return False
-    if self.orange_path != other.orange_path:
-      return False
-    if self.history != other.history:
-      return False
-    if self.blue_solved != other.blue_solved:
-      return False
-    if self.orange_solved != other.orange_solved:
-      return False
-    return True
-
-  def isValidConnection(self, head, (x, y)):
-    if x < 0 or x > 6:
-      return False
-    if y < 0 or y > 4:
-      return False
-    if (x, y) in self.blue_path:
-      return False
-    if (x, y) in self.orange_path:
-      return False
-    if (x, y) in banned_connections and banned_connections[(x, y)] == head:
-      return False
+    # 6 stars, 2 squares
+    interesting_points = [(2, 0), (3, 1), (0, 2), (0, 3), (5, 2), (5, 3), (0, 1), (5, 1)]
+    if dir == 'right':
+      if head[0] == 6: # Issue 3
+        return False
+      if head[0] != 5: # Issue 1b
+        # o..
+        # |
+        # +--
+        if plus(head, 1, 1) == head2 and plus(head, 0, 0) not in interesting_points:
+          return False # Issues 1 and 1a
+        # +--
+        # |
+        # o..
+        if plus(head, 1, -1) == head2 and plus(head, 0, -1) not in interesting_points:
+          return False # Issues 1 and 1a
+      if plus(head, 1, 0) in self.blue_path:
+        return False # Issue 2
+      if plus(head, 1, 0) in self.orange_path:
+        return False # Issue 2
+    elif dir == 'down':
+      if head[1] == 4:
+        return False
+      if head[1] != 3:
+        # +-o
+        # | .
+        # | .
+        if plus(head, -1, 1) == head2 and plus(head, -1, 0) not in interesting_points:
+          return False
+        # o-+
+        # . |
+        # . |
+        if plus(head, 1, 1) == head2 and plus(head, 0, 0) not in interesting_points:
+          return False
+      if plus(head, 0, 1) in self.blue_path:
+        return False
+      if plus(head, 0, 1) in self.orange_path:
+        return False
+    elif dir == 'left':
+      if head[0] == 0:
+        return False
+      if head[0] != 1:
+        # --+
+        #   |
+        # ..o
+        if plus(head, -1, -1) == head2 and plus(head, -1, -1) not in interesting_points:
+          return False
+        # ..o
+        #   |
+        # --+
+        if plus(head, -1, 1) == head2 and plus(head, -1, 0) not in interesting_points:
+          return False
+      if plus(head, -1, 0) in self.blue_path:
+        return False
+      if plus(head, -1, 0) in self.orange_path:
+        return False
+    elif dir == 'up':
+      if head[1] == 0:
+        return False
+      if head[1] != 1:
+        # . |
+        # . |
+        # o-+
+        if plus(head, 1, -1) == head2 and plus(head, 0, -1) not in interesting_points:
+          return False
+        # | .
+        # | .
+        # +-o
+        if plus(head, -1, -1) == head2 and plus(head, -1, -1) not in interesting_points:
+          return False
+      if plus(head, 0, -1) in self.blue_path:
+        return False
+      if plus(head, 0, -1) in self.orange_path:
+        return False
     return True
 
   def clone(self):
@@ -102,36 +166,35 @@ class PartialSolution(Thread):
       if head in [(0, 0), (6, 0), (0, 3), (0, 4), (6, 4)]: # Valid exits
         global solutions
         solutions.append(self)
-      if self.isValidConnection(head, plus(head, (-1, 0))): # Left
+      if self.isValidConnection(head, 'left'):
         newSolution = self.clone()
         if self.color == 'blue':
-          newSolution.blue_path.append(plus(head, (-1, 0)))
+          newSolution.blue_path.append(plus(head, -1, 0))
         elif self.color == 'orange':
-          newSolution.orange_path.append(plus(head, (-1, 0)))
+          newSolution.orange_path.append(plus(head, -1, 0))
         q.put(newSolution)
-      if self.isValidConnection(head, plus(head, (1, 0))): # Right
+      if self.isValidConnection(head, 'right'):
         newSolution = self.clone()
         if self.color == 'blue':
-          newSolution.blue_path.append(plus(head, (1, 0)))
+          newSolution.blue_path.append(plus(head, 1, 0))
         elif self.color == 'orange':
-          newSolution.orange_path.append(plus(head, (1, 0)))
+          newSolution.orange_path.append(plus(head, 1, 0))
         q.put(newSolution)
-      if self.isValidConnection(head, plus(head, (0, -1))): # Up
+      if self.isValidConnection(head, 'up'):
         newSolution = self.clone()
         if self.color == 'blue':
-          newSolution.blue_path.append(plus(head, (0, -1)))
+          newSolution.blue_path.append(plus(head, 0, -1))
         elif self.color == 'orange':
-          newSolution.orange_path.append(plus(head, (0, -1)))
+          newSolution.orange_path.append(plus(head, 0, -1))
         q.put(newSolution)
-      if self.isValidConnection(head, plus(head, (0, 1))): # Down
+      if self.isValidConnection(head, 'down'):
         newSolution = self.clone()
         if self.color == 'blue':
-          newSolution.blue_path.append(plus(head, (0, 1)))
+          newSolution.blue_path.append(plus(head, 0, 1))
         elif self.color == 'orange':
-          newSolution.orange_path.append(plus(head, (0, 1)))
+          newSolution.orange_path.append(plus(head, 0, 1))
         q.put(newSolution)
       q.task_done()
-
 
 # Check if a square is contiguous to a square in the given direction.
 def isConnected(blue_path, orange_path, square, dir):
@@ -242,23 +305,23 @@ def isValidSolution(blue_path, orange_path, verbose=False):
       if isConnected(blue_path, orange_path, square, 'left'):
         if verbose:
           print square, 'is connected to the left'
-        if plus(square, (-1, 0)) not in visit_list:
-          visit_list.append(plus(square, (-1, 0)))
+        if plus(square, -1, 0) not in visit_list:
+          visit_list.append(plus(square, -1, 0))
       if isConnected(blue_path, orange_path, square, 'up'):
         if verbose:
           print square, 'is connected up'
-        if plus(square, (0, -1)) not in visit_list:
-          visit_list.append(plus(square, (0, -1)))
+        if plus(square, 0, -1) not in visit_list:
+          visit_list.append(plus(square, 0, -1))
       if isConnected(blue_path, orange_path, square, 'right'):
         if verbose:
           print square, 'is connected to the right'
-        if plus(square, (1, 0)) not in visit_list:
-          visit_list.append(plus(square, (1, 0)))
+        if plus(square, 1, 0) not in visit_list:
+          visit_list.append(plus(square, 1, 0))
       if isConnected(blue_path, orange_path, square, 'down'):
         if verbose:
           print square, 'is connected down'
-        if plus(square, (0, 1)) not in visit_list:
-          visit_list.append(plus(square, (0, 1)))
+        if plus(square, 0, 1) not in visit_list:
+          visit_list.append(plus(square, 0, 1))
       j += 1
     if verbose:
       print 'Done visiting, contiguous region:', visit_list
@@ -284,58 +347,39 @@ def isValidSolution(blue_path, orange_path, verbose=False):
     if isConnected(blue_path, orange_path, square, 'left'):
       if verbose:
         print square, 'is connected to the left'
-      if plus(square, (-1, 0)) not in visit_list:
-        visit_list.append(plus(square, (-1, 0)))
+      if plus(square, -1, 0) not in visit_list:
+        visit_list.append(plus(square, -1, 0))
     if isConnected(blue_path, orange_path, square, 'up'):
       if verbose:
         print square, 'is connected up'
-      if plus(square, (0, -1)) not in visit_list:
-        visit_list.append(plus(square, (0, -1)))
+      if plus(square, 0, -1) not in visit_list:
+        visit_list.append(plus(square, 0, -1))
     if isConnected(blue_path, orange_path, square, 'right'):
       if verbose:
         print square, 'is connected to the right'
-      if plus(square, (1, 0)) not in visit_list:
-        visit_list.append(plus(square, (1, 0)))
+      if plus(square, 1, 0) not in visit_list:
+        visit_list.append(plus(square, 1, 0))
     if isConnected(blue_path, orange_path, square, 'down'):
       if verbose:
         print square, 'is connected down'
-      if plus(square, (0, 1)) not in visit_list:
-        visit_list.append(plus(square, (0, 1)))
+      if plus(square, 0, 1) not in visit_list:
+        visit_list.append(plus(square, 0, 1))
     j += 1
   if verbose:
     print 'Valid solution found'
   return True
 
-def simplify(to_simplify, to_compare):
+# This attempts to cut out any trivial loops that might have been found.
+def simplify(to_simplify, to_compare): # Simplify during creation (as per copy 0) -> 100n < n^2
   solutions = []
   for s in to_simplify:
     try:
-      for i in range(len(s.blue_path)-2):
-        # This attempts to cut out any trivial loops that might have been found.
-        simplify = s.blue_path[:i]+s.blue_path[i+2:]
-        for c in to_compare:
-          # Avoid simplifications which cut out the colored squares
-          x1, y1 = s.blue_path[i]
-          x2, y2 = s.blue_path[i+2]
-          if (min(x1, x2), min(y1, y2)) == (0, 1):
-            continue
-          if (min(x1, x2), min(y1, y2)) == (5, 1):
-            continue
-          if c.blue_path == simplify:
-            raise StopIteration
-      for i in range(len(s.orange_path)-2):
-        # This attempts to cut out any trivial loops that might have been found.
-        simplify = s.orange_path[:i]+s.orange_path[i+2:]
-        for c in to_compare:
-          # Avoid simplifications which cut out the colored squares
-          x1, y1 = s.orange_path[i]
-          x2, y2 = s.orange_path[i+2]
-          if (min(x1, x2), min(y1, y2)) == (0, 1):
-            continue
-          if (min(x1, x2), min(y1, y2)) == (5, 1):
-            continue
-          if c.orange_path == simplify:
-            raise StopIteration
+      for c in to_compare:
+        if c.blue_path == simplify:
+          raise StopIteration
+      for c in to_compare:
+        if c.orange_path == simplify:
+          raise StopIteration
       solutions.append(s)
     except StopIteration:
       pass
@@ -347,7 +391,6 @@ global q
 q = Queue()
 
 # Stage 0: Calculate all blue and orange paths.
-# Color, blue solved, orange solved, blue path, orange path, history, uuid
 stage0 = time()
 q.put(PartialSolution(root=('blue', False, False, [(3, 4)], [(3, 0)], [], uuid)))
 blue_paths = findSolutions()
@@ -355,7 +398,7 @@ blue_paths = findSolutions()
 q.put(PartialSolution(root=('orange', False, False, [(3, 4)], [(3, 0)], [], uuid)))
 orange_paths = findSolutions()
 # orange_paths = simplify(orange_paths, orange_paths)
-stage1 = time()
+stage1 = time() # 60s, 143232
 print 'Stage 0 done in', stage1-stage0
 print 'Search space', len(blue_paths)+len(orange_paths)
 # Stage 1: Calculate blue paths that take us across
@@ -363,17 +406,25 @@ stage1paths = []
 for bPath in blue_paths:
   if bPath.blue_path[-1] in [(0, 0), (0, 6)] and isValidSolution(bPath.blue_path, [(3, 0)]):
     stage1paths.append(bPath)
-stage2 = time()
+stage1paths = simplify(stage1paths, stage1paths)
+stage2 = time() # 10s, 77 (?)
 print 'Stage 1 done in', stage2-stage1
 print 'Search space', len(stage1paths)
 # Stage 2: Calculate orange paths. It's unlikely that they take us back to blue.
 stage2paths = []
-for bPath in stage1paths:
+def stage2(bPath):
   for oPath in orange_paths:
     if isValidSolution(bPath.blue_path, oPath.orange_path):
       newSolution = oPath.clone()
       newSolution.blue_path = bPath.blue_path
       stage2paths.append(newSolution)
+threads = []
+for bPath in stage1paths:
+  thread = Thread(target=stage2, kwargs={'bPath': bPath})
+  threads.append(thread)
+  thread.start()
+for thread in threads:
+  thread.join()
 stage3 = time()
 print 'Stage 2 done in', stage3-stage2
 print 'Search space', len(stage2paths)
