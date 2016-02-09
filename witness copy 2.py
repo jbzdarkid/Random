@@ -4,7 +4,6 @@ from multiprocessing import Process, Array # Processes are used for simplifying 
 from time import time
 from copy import copy
 
-# Add two tuples together. Credit http://stackoverflow.com/questions/497885/python-element-wise-tuple-operations-like-sum
 def plus(a, b, c):
   return (a[0]+b, a[1]+c)
 
@@ -44,7 +43,7 @@ def findSolutions():
 class PartialSolution(Thread):
   def __init__(self, root=None):
     if root != None:
-      self.color, self.blue_solved, self.orange_solved, self.blue_path, self.orange_path, self.history, self.uuid = root
+      self.color, self.blue_solved, self.orange_solved, self.blue_path, self.orange_path, self.uuid = root
       return
     super(PartialSolution, self).__init__()
 
@@ -56,12 +55,18 @@ class PartialSolution(Thread):
   # 3. Steps forward need to be in bounds
   # 4. Steps forward need to respect the breaks in the board
   def isValidConnection(self, dir):
-    if self.color == 'blue' and len(self.blue_path) > 2:
+    debug = False
+    if self.blue_path == [(3, 4), (4, 4), (5, 4), (6, 4), (6, 3), (6, 2), (5, 2), (5, 3), (4, 3), (3, 3), (2, 3), (2, 4), (1, 4)]:
+      debug = True
+    head2 = None
+    if self.color == 'blue':
       head = self.blue_path[-1]
-      head2 = self.blue_path[-3]
-    if self.color == 'orange' and len(self.orange_path) > 2:
+      if len(self.blue_path) > 2:
+        head2 = self.blue_path[-3]
+    if self.color == 'orange':
       head = self.orange_path[-1]
-      head2 = self.orange_path[-3]
+      if len(self.orange_path) > 2:
+        head2 = self.orange_path[-3]
     if head in banned_connections and dir in banned_connections[head]:
       return False
     # 6 stars, 2 squares
@@ -69,7 +74,7 @@ class PartialSolution(Thread):
     if dir == 'right':
       if head[0] == 6: # Issue 3
         return False
-      if head[0] != 5: # Issue 1b
+      if head[0] != 0: # Issue 1b
         # o..
         # |
         # +--
@@ -87,7 +92,7 @@ class PartialSolution(Thread):
     elif dir == 'down':
       if head[1] == 4:
         return False
-      if head[1] != 3:
+      if head[1] != 0:
         # +-o
         # | .
         # | .
@@ -100,12 +105,12 @@ class PartialSolution(Thread):
           return False
       if plus(head, 0, 1) in self.blue_path:
         return False
-      if plus(head, 0, 1) in self.orange_path:
+      elif plus(head, 0, 1) in self.orange_path:
         return False
     elif dir == 'left':
       if head[0] == 0:
         return False
-      if head[0] != 1:
+      if head[0] != 6:
         # --+
         #   |
         # ..o
@@ -123,7 +128,7 @@ class PartialSolution(Thread):
     elif dir == 'up':
       if head[1] == 0:
         return False
-      if head[1] != 1:
+      if head[1] != 4:
         # . |
         # . |
         # o-+
@@ -147,7 +152,6 @@ class PartialSolution(Thread):
       self.orange_solved,
       copy(self.blue_path),
       copy(self.orange_path),
-      copy(self.history),
       getUUID()
     ))
 
@@ -165,29 +169,32 @@ class PartialSolution(Thread):
         head = self.orange_path[-1]
       if head in [(0, 0), (6, 0), (0, 3), (0, 4), (6, 4)]: # Valid exits
         global solutions
-        solutions.append(self)
-      if self.isValidConnection(head, 'left'):
+        if self.color == 'blue':
+          solutions.append(self.blue_path)
+        elif self.color == 'orange':
+          solutions.append(self.orange_path)
+      if self.isValidConnection('left'):
         newSolution = self.clone()
         if self.color == 'blue':
           newSolution.blue_path.append(plus(head, -1, 0))
         elif self.color == 'orange':
           newSolution.orange_path.append(plus(head, -1, 0))
         q.put(newSolution)
-      if self.isValidConnection(head, 'right'):
+      if self.isValidConnection('right'):
         newSolution = self.clone()
         if self.color == 'blue':
           newSolution.blue_path.append(plus(head, 1, 0))
         elif self.color == 'orange':
           newSolution.orange_path.append(plus(head, 1, 0))
         q.put(newSolution)
-      if self.isValidConnection(head, 'up'):
+      if self.isValidConnection('up'):
         newSolution = self.clone()
         if self.color == 'blue':
           newSolution.blue_path.append(plus(head, 0, -1))
         elif self.color == 'orange':
           newSolution.orange_path.append(plus(head, 0, -1))
         q.put(newSolution)
-      if self.isValidConnection(head, 'down'):
+      if self.isValidConnection('down'):
         newSolution = self.clone()
         if self.color == 'blue':
           newSolution.blue_path.append(plus(head, 0, 1))
@@ -281,9 +288,8 @@ def isValidSolution(blue_path, orange_path, verbose=False):
   # This is o(n^2) and can be sped up to o(n) if the lists are sorted.
   for b in blue_path:
     for o in orange_path:
-      if b == 0:
+      if b == o:
         return False
-
   # For region definitions, we use square centers rather than square corners. The range for stars is thus [0-5, 0-3]
   stars = [(2, 0), (3, 1), (0, 2), (0, 3), (5, 2), (5, 3)]
   for i in range(3): # There are 6 stars, and each time we find one it needs to remove exactly 1 other star.
@@ -392,45 +398,56 @@ q = Queue()
 
 # Stage 0: Calculate all blue and orange paths.
 stage0 = time()
-q.put(PartialSolution(root=('blue', False, False, [(3, 4)], [(3, 0)], [], uuid)))
+q.put(PartialSolution(root=('blue', False, False, [(3, 4)], [(3, 0)], uuid)))
 blue_paths = findSolutions()
-# blue_paths = simplify(blue_paths, blue_paths)
-q.put(PartialSolution(root=('orange', False, False, [(3, 4)], [(3, 0)], [], uuid)))
+q.put(PartialSolution(root=('orange', False, False, [(3, 4)], [(3, 0)], uuid)))
 orange_paths = findSolutions()
-# orange_paths = simplify(orange_paths, orange_paths)
-stage1 = time() # 60s, 143232
+stage1 = time()
 print 'Stage 0 done in', stage1-stage0
 print 'Search space', len(blue_paths)+len(orange_paths)
 # Stage 1: Calculate blue paths that take us across
 stage1paths = []
 for bPath in blue_paths:
-  if bPath.blue_path[-1] in [(0, 0), (0, 6)] and isValidSolution(bPath.blue_path, [(3, 0)]):
+  if bPath[:14] == [(3, 4), (4, 4), (5, 4), (6, 4), (6, 3), (6, 2), (5, 2), (5, 3), (4, 3), (3, 3), (2, 3), (2, 4), (1, 4), (1, 3)]:#, (1, 2), (1, 1), (0, 1), (0, 0)]:
+    print 0
+  if bPath[-1] in [(0, 0), (0, 6)] and isValidSolution(bPath, [(3, 0)]):
     stage1paths.append(bPath)
-stage1paths = simplify(stage1paths, stage1paths)
-stage2 = time() # 10s, 77 (?)
+stage2 = time()
 print 'Stage 1 done in', stage2-stage1
 print 'Search space', len(stage1paths)
 # Stage 2: Calculate orange paths. It's unlikely that they take us back to blue.
-stage2paths = []
-def stage2(bPath):
-  for oPath in orange_paths:
-    if isValidSolution(bPath.blue_path, oPath.orange_path):
-      newSolution = oPath.clone()
-      newSolution.blue_path = bPath.blue_path
-      stage2paths.append(newSolution)
-threads = []
+exits = set()
+stage2paths = {}
 for bPath in stage1paths:
-  thread = Thread(target=stage2, kwargs={'bPath': bPath})
-  threads.append(thread)
-  thread.start()
-for thread in threads:
-  thread.join()
+  for oPath in orange_paths:
+    if isValidSolution(bPath, oPath):
+      if str(oPath) not in stage2paths:
+        stage2paths[str(oPath)] = {}
+      if str(bPath) not in stage2paths[str(oPath)]:
+        stage2paths[str(oPath)][str(bPath)] = True
+        exits.add(str(bPath[-1])+'|'+str(oPath[-1]))
+print exits
 stage3 = time()
 print 'Stage 2 done in', stage3-stage2
-print 'Search space', len(stage2paths)
+print 'Search space', sum([len(stage2paths[g]) for g in stage2paths])
 # Stage 3: Calculate blue paths. These probably still need to take us back to orange.
-
-# Stage 4: Calculate orange paths. These are now allowed
-
+exits = set()
+stage3paths = {}
+for oPath in orange_paths:
+  if str(oPath) not in stage2paths: # Only consider valid oPaths
+    continue
+  for bPath in blue_paths:
+    if str(bPath) not in stage2paths[str(oPath)]: # Only consider bPath, oPath pairs that were not previously possible.
+      if isValidSolution(bPath, oPath):
+        if str(bPath) not in stage3paths:
+          stage3paths[str(bPath)] = {}
+        if str(oPath) not in stage3paths[str(bPath)]:
+          stage3paths[str(bPath)][str(oPath)] = True
+          exits.add(str(bPath[-1])+'|'+str(oPath[-1]))
+print exits
+stage4 = time()
+print 'Stage 3 done in', stage4-stage3
+print 'Search space', sum([len(stage3paths[g]) for g in stage3paths])
+# Stage 4: Calculate an orange path. There is a possiblity that these connect to blue.
 
 
