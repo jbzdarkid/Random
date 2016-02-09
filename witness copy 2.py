@@ -43,7 +43,7 @@ def findSolutions():
 class PartialSolution(Thread):
   def __init__(self, root=None):
     if root != None:
-      self.color, self.blue_solved, self.orange_solved, self.blue_path, self.orange_path, self.uuid = root
+      self.color, self.blue_path, self.orange_path, self.uuid = root
       return
     super(PartialSolution, self).__init__()
 
@@ -55,9 +55,6 @@ class PartialSolution(Thread):
   # 3. Steps forward need to be in bounds
   # 4. Steps forward need to respect the breaks in the board
   def isValidConnection(self, dir):
-    debug = False
-    if self.blue_path == [(3, 4), (4, 4), (5, 4), (6, 4), (6, 3), (6, 2), (5, 2), (5, 3), (4, 3), (3, 3), (2, 3), (2, 4), (1, 4)]:
-      debug = True
     head2 = None
     if self.color == 'blue':
       head = self.blue_path[-1]
@@ -148,8 +145,6 @@ class PartialSolution(Thread):
   def clone(self):
     return PartialSolution(root=(
       self.color,
-      self.blue_solved,
-      self.orange_solved,
       copy(self.blue_path),
       copy(self.orange_path),
       getUUID()
@@ -284,7 +279,7 @@ def isConnected(blue_path, orange_path, square, dir):
       pass
   return True
 
-def isValidSolution(blue_path, orange_path, verbose=False):
+def isValidSolution(blue_path, orange_path):
   # This is o(n^2) and can be sped up to o(n) if the lists are sorted.
   for b in blue_path:
     for o in orange_path:
@@ -295,50 +290,30 @@ def isValidSolution(blue_path, orange_path, verbose=False):
   for i in range(3): # There are 6 stars, and each time we find one it needs to remove exactly 1 other star.
     pair_star = None
     visit_list = [stars.pop()]
-    if verbose:
-      print 'Iteration', i, 'selected star:', visit_list
     j = 0
     while j < len(visit_list):
       square = visit_list[j]
       if square in stars:
         if pair_star is not None:
-          if verbose:
-            print 'Tried to remove 2 stars in one region'
           return False
         pair_star = square
-        if verbose:
-          print 'Found pair star:', square
       if isConnected(blue_path, orange_path, square, 'left'):
-        if verbose:
-          print square, 'is connected to the left'
         if plus(square, -1, 0) not in visit_list:
           visit_list.append(plus(square, -1, 0))
       if isConnected(blue_path, orange_path, square, 'up'):
-        if verbose:
-          print square, 'is connected up'
         if plus(square, 0, -1) not in visit_list:
           visit_list.append(plus(square, 0, -1))
       if isConnected(blue_path, orange_path, square, 'right'):
-        if verbose:
-          print square, 'is connected to the right'
         if plus(square, 1, 0) not in visit_list:
           visit_list.append(plus(square, 1, 0))
       if isConnected(blue_path, orange_path, square, 'down'):
-        if verbose:
-          print square, 'is connected down'
         if plus(square, 0, 1) not in visit_list:
           visit_list.append(plus(square, 0, 1))
       j += 1
-    if verbose:
-      print 'Done visiting, contiguous region:', visit_list
     if pair_star is None:
-      if verbose:
-        print 'Only 1 star in region'
       return False
     stars.remove(pair_star)
   # All stars verified, now check the colored squares
-  if verbose:
-    print 'Valid solution with stars found'
 
   # Black square
   visit_list = [(0, 1)]
@@ -347,32 +322,20 @@ def isValidSolution(blue_path, orange_path, verbose=False):
     square = visit_list[j]
     # White square
     if square == (5, 1):
-      if verbose:
-        print 'Squares are connected'
       return False
     if isConnected(blue_path, orange_path, square, 'left'):
-      if verbose:
-        print square, 'is connected to the left'
       if plus(square, -1, 0) not in visit_list:
         visit_list.append(plus(square, -1, 0))
     if isConnected(blue_path, orange_path, square, 'up'):
-      if verbose:
-        print square, 'is connected up'
       if plus(square, 0, -1) not in visit_list:
         visit_list.append(plus(square, 0, -1))
     if isConnected(blue_path, orange_path, square, 'right'):
-      if verbose:
-        print square, 'is connected to the right'
       if plus(square, 1, 0) not in visit_list:
         visit_list.append(plus(square, 1, 0))
     if isConnected(blue_path, orange_path, square, 'down'):
-      if verbose:
-        print square, 'is connected down'
       if plus(square, 0, 1) not in visit_list:
         visit_list.append(plus(square, 0, 1))
     j += 1
-  if verbose:
-    print 'Valid solution found'
   return True
 
 # This attempts to cut out any trivial loops that might have been found.
@@ -396,58 +359,172 @@ uuid = 0
 global q
 q = Queue()
 
+stages = [None]
+
+path_combos_b = {}
+path_combos_o = {}
 # Stage 0: Calculate all blue and orange paths.
-stage0 = time()
-q.put(PartialSolution(root=('blue', False, False, [(3, 4)], [(3, 0)], uuid)))
+stageStart = time()
+q.put(PartialSolution(root=('blue', [(3, 4)], [(3, 0)], uuid)))
 blue_paths = findSolutions()
-q.put(PartialSolution(root=('orange', False, False, [(3, 4)], [(3, 0)], uuid)))
+q.put(PartialSolution(root=('orange', [(3, 4)], [(3, 0)], uuid)))
 orange_paths = findSolutions()
-stage1 = time()
-print 'Stage 0 done in', stage1-stage0
-print 'Search space', len(blue_paths)+len(orange_paths)
-# Stage 1: Calculate blue paths that take us across
-stage1paths = []
 for bPath in blue_paths:
-  if bPath[:14] == [(3, 4), (4, 4), (5, 4), (6, 4), (6, 3), (6, 2), (5, 2), (5, 3), (4, 3), (3, 3), (2, 3), (2, 4), (1, 4), (1, 3)]:#, (1, 2), (1, 1), (0, 1), (0, 0)]:
-    print 0
-  if bPath[-1] in [(0, 0), (0, 6)] and isValidSolution(bPath, [(3, 0)]):
-    stage1paths.append(bPath)
-stage2 = time()
-print 'Stage 1 done in', stage2-stage1
-print 'Search space', len(stage1paths)
-# Stage 2: Calculate orange paths. It's unlikely that they take us back to blue.
-exits = set()
-stage2paths = {}
-for bPath in stage1paths:
+  path_combos_b[str(bPath)] = {}
+for oPath in orange_paths:
+  path_combos_o[str(oPath)] = {}
+for bPath in blue_paths:
   for oPath in orange_paths:
     if isValidSolution(bPath, oPath):
-      if str(oPath) not in stage2paths:
-        stage2paths[str(oPath)] = {}
-      if str(bPath) not in stage2paths[str(oPath)]:
-        stage2paths[str(oPath)][str(bPath)] = True
-        exits.add(str(bPath[-1])+'|'+str(oPath[-1]))
-print exits
-stage3 = time()
-print 'Stage 2 done in', stage3-stage2
-print 'Search space', sum([len(stage2paths[g]) for g in stage2paths])
-# Stage 3: Calculate blue paths. These probably still need to take us back to orange.
+      path_combos_b[str(bPath)][str(oPath)] = True
+      path_combos_o[str(oPath)][str(bPath)] = True
+stageEnd = time()
+print 'Stage 0 done in', stageEnd-stageStart
+
+stage = 1
+stages = [{str([(3, 0)]):{str([(3, 4)]):True}}] # Starting point is no paths.
+while True:
+  stages.append({})
+  exits = set()
+  stageStart = stageEnd
+  for oPath in orange_paths:
+    if str(oPath) not in stages[stage-1]:
+      continue
+    # All orange paths from the previous configuration
+    for bPath in path_combos_o[str(oPath)]:
+      if str(bPath) in stages[stage-1][str(oPath)]:
+        continue
+      # All valid blue paths *not* from the previous configuration(s)
+      if str(bPath) not in stages[stage]:
+        stages[stage][str(bPath)] = {}
+      stages[stage][str(bPath)][str(oPath)] = True
+      exits.add(str(bPath[-1])+'|'+str(oPath[-1]))
+      # Add to this stage.
+  stageEnd = time()
+  print 'Stage', stage, 'done in', stageEnd-stageStart
+  print 'Exits:', exits
+  stage += 1
+  stages.append({})
+  exits = set()
+  stageStart = stageEnd
+  for bPath in blue_paths:
+    if str(bPath) not in stages[stage-1]:
+      continue
+    # All blue paths from the previous configuration
+    for oPath in path_combos_b[str(bPath)]:
+      if str(oPath) in stages[stage-1][str(bPath)]:
+        continue
+      # All valid orange paths *not* from the previous configuration(s)
+      if str(oPath) not in stages[stage]:
+        stages[stage][str(oPath)] = {}
+      stages[stage][str(bPath)][str(oPath)] = True
+  stageEnd = time()
+  print 'Stage', stage, 'done in', stageEnd-stageStart
+  print 'Exits:', exits
+  stage += 1
+# End while True
+
+
+
+'''
+# Stage 1: Calculate blue paths that take us across
+stageStart = stageEnd
+stages.append([])
+for bPath in blue_paths:
+  if bPath[-1] in [(0, 0), (0, 6)] and isValidSolution(bPath, [(3, 0)]):
+    stages[1].append(bPath)
+stageEnd = time()
+print 'Stage 1 done in', stageEnd-stageStart
+print 'Search space', len(stages[1])
+# Stage 2: Calculate orange paths. It's unlikely that they take us back to blue.
+stageStart = stageEnd
 exits = set()
-stage3paths = {}
+stages.append({})
+for bPath in stages[1]:
+  for oPath in orange_paths:
+    if isValidSolution(bPath, oPath):
+      if str(oPath) not in stages[2]:
+        stages[2][str(oPath)] = {}
+      if str(bPath) not in stages[2][str(oPath)]:
+        stages[2][str(oPath)][str(bPath)] = True
+        exits.add(str(bPath[-1])+'|'+str(oPath[-1]))
+print exits # All exits here are blue-(0, 0) orange-(6, 0)
+stageEnd = time()
+print 'Stage 2 done in', stageEnd-stageStart
+print 'Search space', sum([len(stages[2][g]) for g in stages[2]])
+# Stage 3: Calculate blue paths.
+stageStart = stageEnd
+exits = set()
+stages.append({})
 for oPath in orange_paths:
-  if str(oPath) not in stage2paths: # Only consider valid oPaths
+  if str(oPath) not in stages[2]: # Only consider valid oPaths
     continue
   for bPath in blue_paths:
-    if str(bPath) not in stage2paths[str(oPath)]: # Only consider bPath, oPath pairs that were not previously possible.
-      if isValidSolution(bPath, oPath):
-        if str(bPath) not in stage3paths:
-          stage3paths[str(bPath)] = {}
-        if str(oPath) not in stage3paths[str(bPath)]:
-          stage3paths[str(bPath)][str(oPath)] = True
-          exits.add(str(bPath[-1])+'|'+str(oPath[-1]))
+    if bPath[-1][1] != 0 and oPath[-1][1] != 4: # Impossible to cross the gap
+      continue
+    if str(bPath) in stages[2][str(oPath)]:
+      continue
+    # Only consider bPath, oPath pairs that were not previously possible.
+    if isValidSolution(bPath, oPath):
+      if str(bPath) not in stages[3]:
+        stages[3][str(bPath)] = {}
+      if str(oPath) not in stages[3][str(bPath)]:
+        stages[3][str(bPath)][str(oPath)] = True
+        exits.add(str(bPath[-1])+'|'+str(oPath[-1]))
 print exits
-stage4 = time()
-print 'Stage 3 done in', stage4-stage3
-print 'Search space', sum([len(stage3paths[g]) for g in stage3paths])
-# Stage 4: Calculate an orange path. There is a possiblity that these connect to blue.
+stageEnd = time()
+print 'Stage 3 done in', stageEnd-stageStart
+print 'Search space', sum([len(stages[3][g]) for g in stages[3]])
+# Stage 4: Calculate an orange path.
+stageStart = stageEnd
+exits = set()
+stages.append({})
+for bPath in blue_paths:
+  if str(bPath) not in stages[3]: # Only consider valid bPaths
+    continue
+  for oPath in orange_paths:
+    if bPath[-1][1] != 0 and oPath[-1][1] != 4: # Impossible to cross the gap
+      continue
+    if str(oPath) in stages[3][str(bPath)]:
+      continue
+    if str(oPath) in stages[2] and str(bPath) in stages[2][str(oPath)]:
+      continue
+    # Only consider bPath, oPath pairs that were not previously possible.
+    if isValidSolution(bPath, oPath):
+      if str(oPath) not in stages[4]:
+        stages[4][str(oPath)] = {}
+      if str(bPath) not in stages[4][str(oPath)]:
+        stages[4][str(oPath)][str(bPath)] = True
+        exits.add(str(bPath[-1])+'|'+str(oPath[-1]))
+print exits
+stageEnd = time()
+print 'Stage 4 done in', stageEnd-stageStart
+print 'Search space', sum([len(stages[4][g]) for g in stages[4]])
+# Stage 5 ... loop time!
 
+stage = 5
 
+while True:
+  stageStart = stageEnd
+  exits = set()
+  stages.append({})
+  for bPath in blue_paths:
+    if str(bPath) not in stages[-2]: # Only consider valid bPaths
+      continue
+    for oPath in orange_paths:
+      if bPath[-1][1] != 0 and oPath[-1][1] != 4: # Impossible to cross the gap
+        continue
+      if str(oPath) in stages[3][str(bPath)]:
+        continue
+      if str(oPath) in stages[2] and str(bPath) in stages[2][str(oPath)]:
+        continue
+      # Only consider bPath, oPath pairs that were not previously possible.
+      if isValidSolution(bPath, oPath):
+        if str(oPath) not in stages[4]:
+          stages[4][str(oPath)] = {}
+        if str(bPath) not in stages[4][str(oPath)]:
+          stages[4][str(oPath)][str(bPath)] = True
+          exits.add(str(bPath[-1])+'|'+str(oPath[-1]))
+  print exits
+  stageEnd = time()
+'''
