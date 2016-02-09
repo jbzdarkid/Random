@@ -1,8 +1,12 @@
+# Create a Path() class, define __hash__ and __cmp__ so that it can be used as a dictionary entry.
+# Create two isValidSolution() classes, one using caching, one using on-the-fly calculation. Time to see which is faster, live cache, dead cache, or otf.
+
 from Queue import Queue
 from threading import Lock, Thread # Threads are used for the queue of PartialSolutions.
-from multiprocessing import Process, Array # Processes are used for simplifying solutions and calculating steps
+from collections import deque
 from time import time
 from copy import copy
+from json import dumps, loads
 
 def plus(a, b, c):
   return (a[0]+b, a[1]+c)
@@ -367,164 +371,103 @@ path_combos_o = {}
 stageStart = time()
 q.put(PartialSolution(root=('blue', [(3, 4)], [(3, 0)], uuid)))
 blue_paths = findSolutions()
+blue_paths.append([(3, 4)])
 q.put(PartialSolution(root=('orange', [(3, 4)], [(3, 0)], uuid)))
 orange_paths = findSolutions()
-for bPath in blue_paths:
-  path_combos_b[str(bPath)] = {}
-for oPath in orange_paths:
-  path_combos_o[str(oPath)] = {}
-for bPath in blue_paths:
-  for oPath in orange_paths:
-    if isValidSolution(bPath, oPath):
-      path_combos_b[str(bPath)][str(oPath)] = True
-      path_combos_o[str(oPath)][str(bPath)] = True
+orange_paths.append([(3, 0)])
+try:
+  f = open('stage0_b.txt', 'rb').read()
+  path_combos_b = loads(f)
+  f = open('stage0_o.txt', 'rb').read()
+  path_combos_o = loads(f)
+except IOError:
+  for bPath in blue_paths:
+    for oPath in orange_paths:
+      if isValidSolution(bPath, oPath):
+        if str(bPath) not in path_combos_b:
+          path_combos_b[str(bPath)] = {}
+        path_combos_b[str(bPath)][str(oPath)] = {'parents':[], 'children':[]}
+        if str(oPath) not in path_combos_o:
+          path_combos_o[str(oPath)] = {}
+        path_combos_o[str(oPath)][str(bPath)] = {'parents':[], 'children':[]}
+  f = open('stage0_b.txt', 'wb')
+  f.write(dumps(path_combos_b))
+  f.close()
+  f = open('stage0_o.txt', 'wb')
+  f.write(dumps(path_combos_o))
+  f.close()
 stageEnd = time()
 print 'Stage 0 done in', stageEnd-stageStart
-
-stage = 1
-stages = [{str([(3, 0)]):{str([(3, 4)]):True}}] # Starting point is no paths.
-while True:
-  stages.append({})
-  exits = set()
-  stageStart = stageEnd
-  for oPath in orange_paths:
-    if str(oPath) not in stages[stage-1]:
-      continue
-    # All orange paths from the previous configuration
-    for bPath in path_combos_o[str(oPath)]:
-      if str(bPath) in stages[stage-1][str(oPath)]:
-        continue
-      # All valid blue paths *not* from the previous configuration(s)
-      if str(bPath) not in stages[stage]:
-        stages[stage][str(bPath)] = {}
-      stages[stage][str(bPath)][str(oPath)] = True
-      exits.add(str(bPath[-1])+'|'+str(oPath[-1]))
-      # Add to this stage.
-  stageEnd = time()
-  print 'Stage', stage, 'done in', stageEnd-stageStart
-  print 'Exits:', exits
-  stage += 1
-  stages.append({})
-  exits = set()
-  stageStart = stageEnd
-  for bPath in blue_paths:
-    if str(bPath) not in stages[stage-1]:
-      continue
-    # All blue paths from the previous configuration
-    for oPath in path_combos_b[str(bPath)]:
-      if str(oPath) in stages[stage-1][str(bPath)]:
-        continue
-      # All valid orange paths *not* from the previous configuration(s)
-      if str(oPath) not in stages[stage]:
-        stages[stage][str(oPath)] = {}
-      stages[stage][str(bPath)][str(oPath)] = True
-  stageEnd = time()
-  print 'Stage', stage, 'done in', stageEnd-stageStart
-  print 'Exits:', exits
-  stage += 1
-# End while True
-
-
-
-'''
-# Stage 1: Calculate blue paths that take us across
 stageStart = stageEnd
-stages.append([])
-for bPath in blue_paths:
-  if bPath[-1] in [(0, 0), (0, 6)] and isValidSolution(bPath, [(3, 0)]):
-    stages[1].append(bPath)
+exits_b = []
+exits_o = []
+t = time()
+# Deque is Python's non-threaded queue. I don't use threading here because it's very important that the bfs traversal happen in order.
+to_visit = deque([('SI', 'GN', 'AL'), ([(3, 4)], [(3, 0)], 'blue')]) # Base starting point. Each path is length 1, and we start on the blue side.
+while True:
+  oPath, bPath, color = to_visit.popleft()
+  if (oPath, bPath, color) == ('SI', 'GN', 'AL'):
+    if len(to_visit) == 0:
+      break # No more traversal to be done
+    print (time() - t)/60, 'minutes'
+    t = time()
+    to_visit.append(('SI', 'GN', 'AL'))
+    continue
+  if oPath[-1][1] == 0: # If the orange path connects, we can do something clever where we reset the blue path and continue on the orange side.
+    to_visit.append(([(3, 0)], oPath, 'orange'))
+  if color == 'blue' or oPath[-1][1] == 0: # Orange path connects to blue side or we're on the blue side, look for a new blue path.
+    if str(oPath) in path_combos_o:
+      for new_bPath in blue_paths:
+        if new_bPath == bPath:
+          continue
+        if str(new_bPath) in path_combos_o[str(oPath)]: # Valid path
+          print path_combos_b[str(new_bPath)][str(oPath)]
+          path_combos_b[str(new_bPath)][str(oPath)]['parents'].append((bPath, oPath))
+          path_combos_o[str(oPath)][str(new_bPath)]['parents'].append((bPath, oPath))
+          path_combos_b[str(bPath)][str(oPath)]['children'].append((new_bPath, oPath))
+          path_combos_o[str(oPath)][str(bPath)]['children'].append((new_bPath, oPath))
+          if path_combos_o[str(oPath)][str(new_bPath)]['children'] == []:
+            # If the node has no children, it hasn't been considered. Do so now.
+            to_visit.append((new_bPath, oPath, 'blue'))
+            # Remaking the blue path can only happen from the blue side.
+          if new_bPath[-1] == (0, 3): # Found a solution!
+            exits_b.append((new_bPath, oPath))
+  if color == 'orange' or bPath[-1][1] == 4: # Blue path connects to orange side or we're on the orange side, look for a new orange path.
+    if str(bPath) in path_combos_b:
+      for new_oPath in orange_paths:
+        if new_oPath == oPath:
+          continue
+        if str(new_oPath) in path_combos_b[str(bPath)]: # Valid path
+          path_combos_b[str(bPath)][str(new_oPath)]['parents'].append((bPath, oPath))
+          path_combos_o[str(new_oPath)][str(bPath)]['parents'].append((bPath, oPath))
+          path_combos_b[str(bPath)][str(oPath)]['children'].append((bPath, new_oPath))
+          path_combos_o[str(oPath)][str(bPath)]['children'].append((bPath, new_oPath))
+          if path_combos_b[str(bPath)][str(new_oPath)]['children'] == []:
+            # If the node has no children, it hasn't been considered. Do so now.
+            to_visit.append((bPath, new_oPath, 'orange'))
+            # Remaking the blue path can only happen from the blue side.
+          if new_oPath[-1] == (0, 3): # Found a solution!
+            exits_o.append((bPath, new_oPath))
+
+print len(exits_b)
+print len(exits_o)
+
 stageEnd = time()
 print 'Stage 1 done in', stageEnd-stageStart
-print 'Search space', len(stages[1])
-# Stage 2: Calculate orange paths. It's unlikely that they take us back to blue.
 stageStart = stageEnd
-exits = set()
-stages.append({})
-for bPath in stages[1]:
-  for oPath in orange_paths:
-    if isValidSolution(bPath, oPath):
-      if str(oPath) not in stages[2]:
-        stages[2][str(oPath)] = {}
-      if str(bPath) not in stages[2][str(oPath)]:
-        stages[2][str(oPath)][str(bPath)] = True
-        exits.add(str(bPath[-1])+'|'+str(oPath[-1]))
-print exits # All exits here are blue-(0, 0) orange-(6, 0)
-stageEnd = time()
-print 'Stage 2 done in', stageEnd-stageStart
-print 'Search space', sum([len(stages[2][g]) for g in stages[2]])
-# Stage 3: Calculate blue paths.
-stageStart = stageEnd
-exits = set()
-stages.append({})
-for oPath in orange_paths:
-  if str(oPath) not in stages[2]: # Only consider valid oPaths
-    continue
-  for bPath in blue_paths:
-    if bPath[-1][1] != 0 and oPath[-1][1] != 4: # Impossible to cross the gap
-      continue
-    if str(bPath) in stages[2][str(oPath)]:
-      continue
-    # Only consider bPath, oPath pairs that were not previously possible.
-    if isValidSolution(bPath, oPath):
-      if str(bPath) not in stages[3]:
-        stages[3][str(bPath)] = {}
-      if str(oPath) not in stages[3][str(bPath)]:
-        stages[3][str(bPath)][str(oPath)] = True
-        exits.add(str(bPath[-1])+'|'+str(oPath[-1]))
-print exits
-stageEnd = time()
-print 'Stage 3 done in', stageEnd-stageStart
-print 'Search space', sum([len(stages[3][g]) for g in stages[3]])
-# Stage 4: Calculate an orange path.
-stageStart = stageEnd
-exits = set()
-stages.append({})
-for bPath in blue_paths:
-  if str(bPath) not in stages[3]: # Only consider valid bPaths
-    continue
-  for oPath in orange_paths:
-    if bPath[-1][1] != 0 and oPath[-1][1] != 4: # Impossible to cross the gap
-      continue
-    if str(oPath) in stages[3][str(bPath)]:
-      continue
-    if str(oPath) in stages[2] and str(bPath) in stages[2][str(oPath)]:
-      continue
-    # Only consider bPath, oPath pairs that were not previously possible.
-    if isValidSolution(bPath, oPath):
-      if str(oPath) not in stages[4]:
-        stages[4][str(oPath)] = {}
-      if str(bPath) not in stages[4][str(oPath)]:
-        stages[4][str(oPath)][str(bPath)] = True
-        exits.add(str(bPath[-1])+'|'+str(oPath[-1]))
-print exits
-stageEnd = time()
-print 'Stage 4 done in', stageEnd-stageStart
-print 'Search space', sum([len(stages[4][g]) for g in stages[4]])
-# Stage 5 ... loop time!
+# S2: Calculate orange/blue cost at each node
+# - Cost should also include child link
+# - Cost should include depth & path length
+# S3: Calculate 'total cost' (orange->blue and blue->orange) at each node
+# S4: print solution
 
-stage = 5
+to_visit = deque(exits_b)
+while len(to_visit) > 0:
+  bPath, oPath = to_visit.popleft()
+  cost = path_combos_b[str(bPath)][str(oPath)]['bCost']
+  for parent in path_combos_b[str(bPath)][str(oPath)]['parents']:
+    parent_cost = path_combos_b[str(parent[0])][str(parent[1])]['bCost']
+    if parent_cost[0] >= cost[0]+1:
+      parent_cost[0] = cost[0]+1
 
-while True:
-  stageStart = stageEnd
-  exits = set()
-  stages.append({})
-  for bPath in blue_paths:
-    if str(bPath) not in stages[-2]: # Only consider valid bPaths
-      continue
-    for oPath in orange_paths:
-      if bPath[-1][1] != 0 and oPath[-1][1] != 4: # Impossible to cross the gap
-        continue
-      if str(oPath) in stages[3][str(bPath)]:
-        continue
-      if str(oPath) in stages[2] and str(bPath) in stages[2][str(oPath)]:
-        continue
-      # Only consider bPath, oPath pairs that were not previously possible.
-      if isValidSolution(bPath, oPath):
-        if str(oPath) not in stages[4]:
-          stages[4][str(oPath)] = {}
-        if str(bPath) not in stages[4][str(oPath)]:
-          stages[4][str(oPath)][str(bPath)] = True
-          exits.add(str(bPath[-1])+'|'+str(oPath[-1]))
-  print exits
-  stageEnd = time()
-'''
+
