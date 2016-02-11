@@ -3,6 +3,7 @@
 
 from Queue import Queue
 from threading import Lock, Thread # Threads are used for the queue of PartialSolutions.
+from collections import deque
 from time import time
 from copy import copy
 from json import dumps, loads
@@ -385,10 +386,10 @@ except IOError:
       if isValidSolution(bPath, oPath):
         if str(bPath) not in path_combos_b:
           path_combos_b[str(bPath)] = {}
-        path_combos_b[str(bPath)][str(oPath)] = {'parents':[], 'children':[]}
+        path_combos_b[str(bPath)][str(oPath)] = {'parents':[], 'children':None}
         if str(oPath) not in path_combos_o:
           path_combos_o[str(oPath)] = {}
-        path_combos_o[str(oPath)][str(bPath)] = {'parents':[], 'children':[]}
+        path_combos_o[str(oPath)][str(bPath)] = {'parents':[], 'children':None}
   f = open('stage0_b.txt', 'wb')
   f.write(dumps(path_combos_b))
   f.close()
@@ -401,17 +402,16 @@ stageStart = stageEnd
 exits_b = []
 exits_o = []
 t = time()
-to_visit = Queue()
-to_visit.put(('SI', 'GN', 'AL'))
-to_visit.put(([(3, 4)], [(3, 0)], 'blue')) # Base starting point: Each path is length 1, and we start on the blue side.
+visited = 0
+to_visit = deque([('SI', 'GN', 'AL'), ([(3, 4)], [(3, 0)], 'blue')]) # Base starting point: Each path is length 1, and we start on the blue side.
 while True:
-  bPath, oPath, color = to_visit.get()
+  bPath, oPath, color = to_visit.popleft()
   if (bPath, oPath, color) == ('SI', 'GN', 'AL'):
-    if to_visit.empty():
+    if len(to_visit) == 0:
       break # No more traversal to be done
-    print format_time(time() - t), to_visit.qsize()
+    print format_time(time() - t), len(to_visit)
     t = time()
-    to_visit.put(('SI', 'GN', 'AL'))
+    to_visit.append(('SI', 'GN', 'AL'))
     continue
   if color == 'blue' or oPath[-1][1] == 0: # Orange path connects to blue side or we're on the blue side, look for a new blue path.
     if str(oPath) in path_combos_o:
@@ -423,9 +423,11 @@ while True:
           path_combos_o[str(oPath)][str(new_bPath)]['parents'].append((bPath, oPath))
           path_combos_b[str(bPath)][str(oPath)]['children'].append((new_bPath, oPath))
           path_combos_o[str(oPath)][str(bPath)]['children'].append((new_bPath, oPath))
-          if path_combos_o[str(oPath)][str(new_bPath)]['children'] == []:
+          if path_combos_o[str(oPath)][str(new_bPath)]['children'] == None:
+            path_combos_b[str(new_bPath)][str(oPath)]['children'] = []
+            path_combos_o[str(oPath)][str(new_bPath)]['children'] = []
             # If the node has no children, it hasn't been considered. Do so now.
-            to_visit.put((new_bPath, oPath, 'blue'))
+            to_visit.append((new_bPath, oPath, 'blue'))
             # Remaking the blue path can only happen from the blue side.
           if new_bPath[-1] == (0, 3): # Found a solution!
             exits_b.append((new_bPath, oPath))
@@ -439,9 +441,11 @@ while True:
           path_combos_o[str(new_oPath)][str(bPath)]['parents'].append((bPath, oPath))
           path_combos_b[str(bPath)][str(oPath)]['children'].append((bPath, new_oPath))
           path_combos_o[str(oPath)][str(bPath)]['children'].append((bPath, new_oPath))
-          if path_combos_b[str(bPath)][str(new_oPath)]['children'] == []:
+          if path_combos_b[str(bPath)][str(new_oPath)]['children'] == None:
+            path_combos_b[str(bPath)][str(new_oPath)]['children'] = []
+            path_combos_o[str(new_oPath)][str(bPath)]['children'] = []
             # If the node has no children, it hasn't been considered. Do so now.
-            to_visit.put((bPath, new_oPath, 'orange'))
+            to_visit.append((bPath, new_oPath, 'orange'))
             # Remaking the blue path can only happen from the blue side.
           if new_oPath[-1] == (0, 3): # Found a solution!
             exits_o.append((bPath, new_oPath))
@@ -452,18 +456,25 @@ print len(exits_o)
 stageEnd = time()
 print 'Stage 1 done in', format_time(stageEnd-stageStart)
 stageStart = stageEnd
-# S2: Calculate orange/blue cost at each node
+# Stage 2: Calculate orange/blue cost at each node
 # - Cost should also include child link
 # - Cost should include depth & path length
 
-to_visit = Queue()
-_ = [to_visit.put(exit) for exit in exist_b] # Faster according to https://wiki.python.org/moin/PythonSpeed/PerformanceTips
-to_visit = Queue(exits_b)
+to_visit = deque(exits_b)
 while len(to_visit) > 0:
   bPath, oPath = to_visit.popleft()
   cost = path_combos_b[str(bPath)][str(oPath)]['bCost']
   for parent in path_combos_b[str(bPath)][str(oPath)]['parents']:
     parent_cost = path_combos_b[str(parent[0])][str(parent[1])]['bCost']
+    if parent_cost > cost+1:
+      parent_cost = cost+1
+
+to_visit = deque(exits_o)
+while len(to_visit) > 0:
+  bPath, oPath = to_visit.popleft()
+  cost = path_combos_o[str(oPath)][str(bPath)]['oCost']
+  for parent in path_combos_o[str(oPath)][str(bPath)]['parents']:
+    parent_cost = path_combos_o[str(parent[0])][str(parent[1])]['oCost']
     if parent_cost > cost+1:
       parent_cost = cost+1
 
