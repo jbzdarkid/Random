@@ -3,13 +3,28 @@
 
 from Queue import Queue
 from threading import Lock, Thread # Threads are used for the queue of PartialSolutions.
-from collections import deque
 from time import time
 from copy import copy
 from json import dumps, loads
 
 def plus(a, b, c):
   return (a[0]+b, a[1]+c)
+
+def format_time(seconds):
+  from math import floor
+  if seconds < 1:
+    return '%0.2f milliseconds' % (seconds*1000)
+  seconds = floor(seconds)
+  time_spent = ''
+  if seconds > 3600:
+    time_spent += '%d hour%s' % (seconds/3600, '' if seconds/3600 == 1 else 's')
+    seconds %= 60
+  if seconds > 60:
+    time_spent += '%d minute%s, ' % (seconds/60, '' if seconds/60 == 1 else 's')
+    seconds %= 60
+  if seconds > 0:
+    time_spent += '%d second%s, ' % (seconds, '' if seconds == 1 else 's')
+  return time_spent[:-2]
 
 # The puzzle grid is a 7x5, so indices range from [0-6][0-4].
 banned_connections = {
@@ -342,22 +357,6 @@ def isValidSolution(blue_path, orange_path):
     j += 1
   return True
 
-# This attempts to cut out any trivial loops that might have been found.
-def simplify(to_simplify, to_compare): # Simplify during creation (as per copy 0) -> 100n < n^2
-  solutions = []
-  for s in to_simplify:
-    try:
-      for c in to_compare:
-        if c.blue_path == simplify:
-          raise StopIteration
-      for c in to_compare:
-        if c.orange_path == simplify:
-          raise StopIteration
-      solutions.append(s)
-    except StopIteration:
-      pass
-  return solutions
-
 global uuid
 uuid = 0
 global q
@@ -365,8 +364,8 @@ q = Queue()
 
 stages = [None]
 
-path_combos_b = {}
-path_combos_o = {}
+path_combos_b = {'[(3, 4)]':{'[(3, 0)]':{'parents':[], 'children':[]}}}
+path_combos_o = {'[(3, 0)]':{'[(3, 4)]':{'parents':[], 'children':[]}}}
 # Stage 0: Calculate all blue and orange paths.
 stageStart = time()
 q.put(PartialSolution(root=('blue', [(3, 4)], [(3, 0)], uuid)))
@@ -397,38 +396,36 @@ except IOError:
   f.write(dumps(path_combos_o))
   f.close()
 stageEnd = time()
-print 'Stage 0 done in', stageEnd-stageStart
+print 'Stage 0 done in', format_time(stageEnd-stageStart)
 stageStart = stageEnd
 exits_b = []
 exits_o = []
 t = time()
-# Deque is Python's non-threaded queue. I don't use threading here because it's very important that the bfs traversal happen in order.
-to_visit = deque([('SI', 'GN', 'AL'), ([(3, 4)], [(3, 0)], 'blue')]) # Base starting point. Each path is length 1, and we start on the blue side.
+to_visit = Queue()
+to_visit.put(('SI', 'GN', 'AL'))
+to_visit.put(([(3, 4)], [(3, 0)], 'blue')) # Base starting point: Each path is length 1, and we start on the blue side.
 while True:
-  oPath, bPath, color = to_visit.popleft()
-  if (oPath, bPath, color) == ('SI', 'GN', 'AL'):
-    if len(to_visit) == 0:
+  bPath, oPath, color = to_visit.get()
+  if (bPath, oPath, color) == ('SI', 'GN', 'AL'):
+    if to_visit.empty():
       break # No more traversal to be done
-    print (time() - t)/60, 'minutes'
+    print format_time(time() - t), to_visit.qsize()
     t = time()
-    to_visit.append(('SI', 'GN', 'AL'))
+    to_visit.put(('SI', 'GN', 'AL'))
     continue
-  if oPath[-1][1] == 0: # If the orange path connects, we can do something clever where we reset the blue path and continue on the orange side.
-    to_visit.append(([(3, 0)], oPath, 'orange'))
   if color == 'blue' or oPath[-1][1] == 0: # Orange path connects to blue side or we're on the blue side, look for a new blue path.
     if str(oPath) in path_combos_o:
       for new_bPath in blue_paths:
         if new_bPath == bPath:
           continue
         if str(new_bPath) in path_combos_o[str(oPath)]: # Valid path
-          print path_combos_b[str(new_bPath)][str(oPath)]
           path_combos_b[str(new_bPath)][str(oPath)]['parents'].append((bPath, oPath))
           path_combos_o[str(oPath)][str(new_bPath)]['parents'].append((bPath, oPath))
           path_combos_b[str(bPath)][str(oPath)]['children'].append((new_bPath, oPath))
           path_combos_o[str(oPath)][str(bPath)]['children'].append((new_bPath, oPath))
           if path_combos_o[str(oPath)][str(new_bPath)]['children'] == []:
             # If the node has no children, it hasn't been considered. Do so now.
-            to_visit.append((new_bPath, oPath, 'blue'))
+            to_visit.put((new_bPath, oPath, 'blue'))
             # Remaking the blue path can only happen from the blue side.
           if new_bPath[-1] == (0, 3): # Found a solution!
             exits_b.append((new_bPath, oPath))
@@ -444,7 +441,7 @@ while True:
           path_combos_o[str(oPath)][str(bPath)]['children'].append((bPath, new_oPath))
           if path_combos_b[str(bPath)][str(new_oPath)]['children'] == []:
             # If the node has no children, it hasn't been considered. Do so now.
-            to_visit.append((bPath, new_oPath, 'orange'))
+            to_visit.put((bPath, new_oPath, 'orange'))
             # Remaking the blue path can only happen from the blue side.
           if new_oPath[-1] == (0, 3): # Found a solution!
             exits_o.append((bPath, new_oPath))
@@ -453,21 +450,26 @@ print len(exits_b)
 print len(exits_o)
 
 stageEnd = time()
-print 'Stage 1 done in', stageEnd-stageStart
+print 'Stage 1 done in', format_time(stageEnd-stageStart)
 stageStart = stageEnd
 # S2: Calculate orange/blue cost at each node
 # - Cost should also include child link
 # - Cost should include depth & path length
-# S3: Calculate 'total cost' (orange->blue and blue->orange) at each node
-# S4: print solution
 
-to_visit = deque(exits_b)
+to_visit = Queue()
+_ = [to_visit.put(exit) for exit in exist_b] # Faster according to https://wiki.python.org/moin/PythonSpeed/PerformanceTips
+to_visit = Queue(exits_b)
 while len(to_visit) > 0:
   bPath, oPath = to_visit.popleft()
   cost = path_combos_b[str(bPath)][str(oPath)]['bCost']
   for parent in path_combos_b[str(bPath)][str(oPath)]['parents']:
     parent_cost = path_combos_b[str(parent[0])][str(parent[1])]['bCost']
-    if parent_cost[0] >= cost[0]+1:
-      parent_cost[0] = cost[0]+1
+    if parent_cost > cost+1:
+      parent_cost = cost+1
 
+stageEnd = time()
+print 'Stage 2 done in', stageEnd-stageStart
+stageStart = stageEnd
 
+# S3: Calculate 'total cost' (orange->blue and blue->orange) at each node
+# S4: print solution
