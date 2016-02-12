@@ -365,8 +365,9 @@ q = Queue()
 
 stages = [None]
 
-path_combos_b = {'[(3, 4)]':{'[(3, 0)]':{'parents':[], 'children':[], 'cost':{'blue':(999, 999, None), 'orange':(999, 999, None), 'blue->orange':(999, 999, None), 'orange->blue':(999, 999, None)}}}}
-path_combos_o = {'[(3, 0)]':{'[(3, 4)]':{'parents':[], 'children':[], 'cost':{'blue':(999, 999, None), 'orange':(999, 999, None), 'blue->orange':(999, 999, None), 'orange->blue':(999, 999, None)}}}}
+# These are initialized separately because A. they aren't valid paths, and B. they need to have a children array defined (as a base case).
+path_combos_b = {'[(3, 4)]':{'[(3, 0)]':{'parents':[], 'children':[],'cost':{'blue':None, 'blue->orange':None}}}}
+path_combos_o = {'[(3, 0)]':{'[(3, 4)]':{'parents':[], 'children':[], 'cost':{'orange':None, 'orange->blue':None}}}}
 # Stage 0: Calculate all blue and orange paths.
 stageStart = time()
 q.put(PartialSolution(root=('blue', [(3, 4)], [(3, 0)], uuid)))
@@ -380,10 +381,10 @@ for bPath in blue_paths:
     if isValidSolution(bPath, oPath):
       if str(bPath) not in path_combos_b:
         path_combos_b[str(bPath)] = {}
-      path_combos_b[str(bPath)][str(oPath)] = {'parents':[], 'children':None, 'cost':{'blue':(999, 999, None), 'orange':(999, 999, None), 'blue->orange':(999, 999, None), 'orange->blue':(999, 999, None)}}
+      path_combos_b[str(bPath)][str(oPath)] = {'parents':[], 'children':None, 'cost':{'blue':None, 'blue->orange':None}}
       if str(oPath) not in path_combos_o:
         path_combos_o[str(oPath)] = {}
-      path_combos_o[str(oPath)][str(bPath)] = {'parents':[], 'children':None, 'cost':{'blue':(999, 999, None), 'orange':(999, 999, None), 'blue->orange':(999, 999, None), 'orange->blue':(999, 999, None)}}
+      path_combos_o[str(oPath)][str(bPath)] = {'parents':[], 'children':None, 'cost':{'orange':None, 'orange->blue':None}}
 stageEnd = time()
 print 'Stage 0 done in', format_time(stageEnd-stageStart)
 stageStart = stageEnd
@@ -438,22 +439,24 @@ stageStart = stageEnd
 
 def update_cost(parent, parent_cost, child, child_cost):
   if parent[0] == child[0]: # Orange path was changed to make this connection
-    if parent_cost[0] > child_cost[0]:
+    if parent_cost == None:
       parent_cost = (child_cost[0]+1, child_cost[1]+len(child[1]), child)
       return True
+    elif parent_cost[0] > child_cost[0]:
+      parent_cost = (child_cost[0]+1, child_cost[1]+len(child[1]), child)
     elif parent_cost[0] == child_cost[0] and parent_cost[1] > child_cost[1] + len(child[1]):
       parent_cost = (child_cost[0]+1, child_cost[1]+len(child[1]), child)
-      return True
   else: # Blue path was changed to make this connection
-    if parent_cost[0] > child_cost[0]:
+    if parent_cost == None:
       parent_cost = (child_cost[0]+1, child_cost[1]+len(child[0]), child)
       return True
-    elif parent_cost[0] == cost[0] and parent_cost[1] > child_cost[1] + len(child[0]):
+    elif parent_cost[0] > child_cost[0]:
       parent_cost = (child_cost[0]+1, child_cost[1]+len(child[0]), child)
-      return True
+    elif parent_cost[0] == child_cost[0] and parent_cost[1] > child_cost[1] + len(child[0]):
+      parent_cost = (child_cost[0]+1, child_cost[1]+len(child[0]), child)
   return False
 
-# Cost at each node to reach a blue solution
+# Calculates cost at each node to reach a blue solution
 to_visit = deque(exits_b)
 while len(to_visit) > 0:
   bPath, oPath = to_visit.popleft()
@@ -466,9 +469,8 @@ while len(to_visit) > 0:
     ):
       to_visit.append(parent)
 
-
-# Cost at each node to reach an orange solution
-# Cost at each node to reach an orange solution, then a blue solution
+# Calculates cost at each node to reach an orange solution
+# Calculates cost at each node to reach an orange solution, then a blue solution
 to_visit = deque(exits_o)
 while len(to_visit) > 0:
   bPath, oPath = to_visit.popleft()
@@ -487,8 +489,7 @@ while len(to_visit) > 0:
     )]):
       to_visit.append(parent)
 
-
-# Cost at each node to reach a blue solution, then an orange solution
+# Calculates cost at each node to reach a blue solution, then an orange solution
 to_visit = deque(exits_b)
 while len(to_visit) > 0:
   bPath, oPath = to_visit.popleft()
@@ -505,9 +506,6 @@ while len(to_visit) > 0:
 stageEnd = time()
 print 'Stage 2 done in', format_time(stageEnd-stageStart)
 stageStart = stageEnd
-
-print path_combos_b['[(3, 4)]']['[(3, 0)]']
-print path_combos_o['[(3, 0)]']['[(3, 4)]']
 
 node = ([(3, 4)], [(3, 0)])
 while True:
