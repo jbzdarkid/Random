@@ -1,16 +1,119 @@
 # Create a Path() class, define __hash__ and __cmp__ so that it can be used as a dictionary entry.
-# Work isValidSolution() into stage 1 not stage 0.
+# Work isValidSolution() into stage 1 not stage 0... May not work because I need to know which blue_paths are a valid start -- which involves doing all the work anyways.
 
-from Queue import Queue
-from threading import Lock, Thread # Threads are used for the queue of PartialSolutions.
 from collections import deque
 from time import time
 from copy import copy
-from json import dumps, loads
 
+# Adds (b, c) to a=(x, y)
 def plus(a, b, c):
   return (a[0]+b, a[1]+c)
 
+# Checks if a path is valid. Considerations are:
+# 1. Steps forward should avoid forming loops (pictured in the comments, with o as the head and .. as the potential next step)
+# 1a. Loops are OK when capturing an interesting point, such as a star or a square.
+# 1b. Loops are OK when they hit the edge of the board, as this can divide stars.
+# 2. Steps forward need to not collide with other paths
+# 3. Steps forward need to be in bounds
+# 4. Steps forward need to respect the breaks in the board
+def isValidConnection(color, blue_path, orange_path, dir):
+  banned_connections = {
+    (0,2):['down'],
+    (0,3):['up', 'down'],
+    (0,4):['up'],
+    (1,0):['right'],
+    (2,0):['left'],
+    (4,0):['right'],
+    (5,0):['left']
+  }
+  head2 = None
+  if color == 'blue':
+    head = blue_path[-1]
+    if len(blue_path) > 2:
+      head2 = blue_path[-3]
+  if color == 'orange':
+    head = orange_path[-1]
+    if len(orange_path) > 2:
+      head2 = orange_path[-3]
+  if head in banned_connections and dir in banned_connections[head]:
+    return False
+  # 6 stars, 2 squares
+  interesting_points = [(2, 0), (3, 1), (0, 2), (0, 3), (5, 2), (5, 3), (0, 1), (5, 1)]
+  if dir == 'right':
+    if head[0] == 6: # Issue 3
+      return False
+    if head[0] != 0: # Issue 1b
+      # o..
+      # |
+      # +--
+      if plus(head, 1, 1) == head2 and plus(head, 0, 0) not in interesting_points:
+        return False # Issues 1 and 1a
+      # +--
+      # |
+      # o..
+      if plus(head, 1, -1) == head2 and plus(head, 0, -1) not in interesting_points:
+        return False # Issues 1 and 1a
+    if plus(head, 1, 0) in blue_path:
+      return False # Issue 2
+    if plus(head, 1, 0) in orange_path:
+      return False # Issue 2
+  elif dir == 'down':
+    if head[1] == 4:
+      return False
+    if head[1] != 0:
+      # +-o
+      # | .
+      # | .
+      if plus(head, -1, 1) == head2 and plus(head, -1, 0) not in interesting_points:
+        return False
+      # o-+
+      # . |
+      # . |
+      if plus(head, 1, 1) == head2 and plus(head, 0, 0) not in interesting_points:
+        return False
+    if plus(head, 0, 1) in blue_path:
+      return False
+    elif plus(head, 0, 1) in orange_path:
+      return False
+  elif dir == 'left':
+    if head[0] == 0:
+      return False
+    if head[0] != 6:
+      # --+
+      #   |
+      # ..o
+      if plus(head, -1, -1) == head2 and plus(head, -1, -1) not in interesting_points:
+        return False
+      # ..o
+      #   |
+      # --+
+      if plus(head, -1, 1) == head2 and plus(head, -1, 0) not in interesting_points:
+        return False
+    if plus(head, -1, 0) in blue_path:
+      return False
+    if plus(head, -1, 0) in orange_path:
+      return False
+  elif dir == 'up':
+    if head[1] == 0:
+      return False
+    if head[1] != 4:
+      # . |
+      # . |
+      # o-+
+      if plus(head, 1, -1) == head2 and plus(head, 0, -1) not in interesting_points:
+        return False
+      # | .
+      # | .
+      # +-o
+      if plus(head, -1, -1) == head2 and plus(head, -1, -1) not in interesting_points:
+        return False
+    if plus(head, 0, -1) in blue_path:
+      return False
+    if plus(head, 0, -1) in orange_path:
+      return False
+  return True
+
+# Convert seconds into a more human-readable time amount
 def format_time(seconds):
   from math import floor
   if seconds < 1:
@@ -27,179 +130,50 @@ def format_time(seconds):
     time_spent += '%d second%s, ' % (seconds, '' if seconds == 1 else 's')
   return time_spent[:-2]
 
-# The puzzle grid is a 7x5, so indices range from [0-6][0-4].
-banned_connections = {
-  (0,2):['down'],
-  (0,3):['up', 'down'],
-  (0,4):['up'],
-  (1,0):['right'],
-  (2,0):['left'],
-  (4,0):['right'],
-  (5,0):['left']
-}
-
-def findSolutions():
-  global solutions
+# Find all valid blue and orange paths from a given base point
+def findSolutions(base):
+  to_visit = deque([base])
   solutions = []
-  thread = PartialSolution()
-  thread.run()
+  while len(to_visit) > 0:
+    color, blue_path, orange_path = to_visit.popleft()
+    if color == 'blue':
+      head = blue_path[-1]
+    elif color == 'orange':
+      head = orange_path[-1]
+    if head in [(0, 0), (6, 0), (0, 3), (0, 4), (6, 4)]: # Valid exits
+      if color == 'blue':
+        solutions.append(blue_path)
+      elif color == 'orange':
+        solutions.append(orange_path)
+    if isValidConnection(color, blue_path, orange_path, 'left'):
+      newSolution = (color, copy(blue_path), copy(orange_path))
+      if color == 'blue':
+        newSolution[1].append(plus(head, -1, 0))
+      elif color == 'orange':
+        newSolution[2].append(plus(head, -1, 0))
+      to_visit.append(newSolution)
+    if isValidConnection(color, blue_path, orange_path, 'right'):
+      newSolution = (color, copy(blue_path), copy(orange_path))
+      if color == 'blue':
+        newSolution[1].append(plus(head, 1, 0))
+      elif color == 'orange':
+        newSolution[2].append(plus(head, 1, 0))
+      to_visit.append(newSolution)
+    if isValidConnection(color, blue_path, orange_path, 'up'):
+      newSolution = (color, copy(blue_path), copy(orange_path))
+      if color == 'blue':
+        newSolution[1].append(plus(head, 0, -1))
+      elif color == 'orange':
+        newSolution[2].append(plus(head, 0, -1))
+      to_visit.append(newSolution)
+    if isValidConnection(color, blue_path, orange_path, 'down'):
+      newSolution = (color, copy(blue_path), copy(orange_path))
+      if color == 'blue':
+        newSolution[1].append(plus(head, 0, 1))
+      elif color == 'orange':
+        newSolution[2].append(plus(head, 0, 1))
+      to_visit.append(newSolution)
   return solutions
-
-class PartialSolution():
-  def __init__(self, root=None):
-    if root != None:
-      self.color, self.blue_path, self.orange_path = root
-      return
-
-  # Checks if a path is valid. Considerations are:
-  # 1. Steps forward should avoid forming loops (pictured in the comments, with o as the head and .. as the potential next step)
-  # 1a. Loops are OK when capturing an interesting point, such as a star or a square.
-  # 1b. Loops are OK when they hit the edge of the board, as this can divide stars.
-  # 2. Steps forward need to not collide with other paths
-  # 3. Steps forward need to be in bounds
-  # 4. Steps forward need to respect the breaks in the board
-  def isValidConnection(self, dir):
-    head2 = None
-    if self.color == 'blue':
-      head = self.blue_path[-1]
-      if len(self.blue_path) > 2:
-        head2 = self.blue_path[-3]
-    if self.color == 'orange':
-      head = self.orange_path[-1]
-      if len(self.orange_path) > 2:
-        head2 = self.orange_path[-3]
-    if head in banned_connections and dir in banned_connections[head]:
-      return False
-    # 6 stars, 2 squares
-    interesting_points = [(2, 0), (3, 1), (0, 2), (0, 3), (5, 2), (5, 3), (0, 1), (5, 1)]
-    if dir == 'right':
-      if head[0] == 6: # Issue 3
-        return False
-      if head[0] != 0: # Issue 1b
-        # o..
-        # |
-        # +--
-        if plus(head, 1, 1) == head2 and plus(head, 0, 0) not in interesting_points:
-          return False # Issues 1 and 1a
-        # +--
-        # |
-        # o..
-        if plus(head, 1, -1) == head2 and plus(head, 0, -1) not in interesting_points:
-          return False # Issues 1 and 1a
-      if plus(head, 1, 0) in self.blue_path:
-        return False # Issue 2
-      if plus(head, 1, 0) in self.orange_path:
-        return False # Issue 2
-    elif dir == 'down':
-      if head[1] == 4:
-        return False
-      if head[1] != 0:
-        # +-o
-        # | .
-        # | .
-        if plus(head, -1, 1) == head2 and plus(head, -1, 0) not in interesting_points:
-          return False
-        # o-+
-        # . |
-        # . |
-        if plus(head, 1, 1) == head2 and plus(head, 0, 0) not in interesting_points:
-          return False
-      if plus(head, 0, 1) in self.blue_path:
-        return False
-      elif plus(head, 0, 1) in self.orange_path:
-        return False
-    elif dir == 'left':
-      if head[0] == 0:
-        return False
-      if head[0] != 6:
-        # --+
-        #   |
-        # ..o
-        if plus(head, -1, -1) == head2 and plus(head, -1, -1) not in interesting_points:
-          return False
-        # ..o
-        #   |
-        # --+
-        if plus(head, -1, 1) == head2 and plus(head, -1, 0) not in interesting_points:
-          return False
-      if plus(head, -1, 0) in self.blue_path:
-        return False
-      if plus(head, -1, 0) in self.orange_path:
-        return False
-    elif dir == 'up':
-      if head[1] == 0:
-        return False
-      if head[1] != 4:
-        # . |
-        # . |
-        # o-+
-        if plus(head, 1, -1) == head2 and plus(head, 0, -1) not in interesting_points:
-          return False
-        # | .
-        # | .
-        # +-o
-        if plus(head, -1, -1) == head2 and plus(head, -1, -1) not in interesting_points:
-          return False
-      if plus(head, 0, -1) in self.blue_path:
-        return False
-      if plus(head, 0, -1) in self.orange_path:
-        return False
-    return True
-
-  def clone(self):
-    return PartialSolution(root=(
-      self.color,
-      copy(self.blue_path),
-      copy(self.orange_path)
-    ))
-
-  def run(self):
-    while True:
-      from Queue import Empty
-      global q
-      try:
-        self = q.get(True, 1)
-      except Empty:
-        return
-      if self.color == 'blue':
-        head = self.blue_path[-1]
-      elif self.color == 'orange':
-        head = self.orange_path[-1]
-      if head in [(0, 0), (6, 0), (0, 3), (0, 4), (6, 4)]: # Valid exits
-        global solutions
-        if self.color == 'blue':
-          solutions.append(self.blue_path)
-        elif self.color == 'orange':
-          solutions.append(self.orange_path)
-      if self.isValidConnection('left'):
-        newSolution = self.clone()
-        if self.color == 'blue':
-          newSolution.blue_path.append(plus(head, -1, 0))
-        elif self.color == 'orange':
-          newSolution.orange_path.append(plus(head, -1, 0))
-        q.put(newSolution)
-      if self.isValidConnection('right'):
-        newSolution = self.clone()
-        if self.color == 'blue':
-          newSolution.blue_path.append(plus(head, 1, 0))
-        elif self.color == 'orange':
-          newSolution.orange_path.append(plus(head, 1, 0))
-        q.put(newSolution)
-      if self.isValidConnection('up'):
-        newSolution = self.clone()
-        if self.color == 'blue':
-          newSolution.blue_path.append(plus(head, 0, -1))
-        elif self.color == 'orange':
-          newSolution.orange_path.append(plus(head, 0, -1))
-        q.put(newSolution)
-      if self.isValidConnection('down'):
-        newSolution = self.clone()
-        if self.color == 'blue':
-          newSolution.blue_path.append(plus(head, 0, 1))
-        elif self.color == 'orange':
-          newSolution.orange_path.append(plus(head, 0, 1))
-        q.put(newSolution)
-      q.task_done()
 
 # Check if a square is contiguous to a square in the given direction.
 def isConnected(blue_path, orange_path, square, dir):
@@ -341,22 +315,15 @@ def isValidSolution(blue_path, orange_path):
     j += 1
   return True
 
-global q
-q = Queue()
-
-stages = [None]
-
+# Stage 0: Calculate all blue and orange paths.
+stageStart = time()
+blue_paths = findSolutions(('blue', [(3, 4)], [(3, 0)]))
+blue_paths.append([(3, 4)]) # Added in for the start point
+orange_paths = findSolutions(('orange', [(3, 4)], [(3, 0)]))
+orange_paths.append([(3, 0)]) # Added in for the start point
 # These are initialized separately because A. they aren't valid paths, and B. they need to have a children array defined (as a base case).
 path_combos_b = {'[(3, 4)]':{'[(3, 0)]':{'parents':[],'cost':None, 'pCost': (0, None)}}}
 path_combos_o = {'[(3, 0)]':{'[(3, 4)]':{'parents':[],'cost':None, 'pCost': (0, None)}}}
-# Stage 0: Calculate all blue and orange paths.
-stageStart = time()
-q.put(PartialSolution(root=('blue', [(3, 4)], [(3, 0)])))
-blue_paths = findSolutions()
-blue_paths.append([(3, 4)])
-q.put(PartialSolution(root=('orange', [(3, 4)], [(3, 0)])))
-orange_paths = findSolutions()
-orange_paths.append([(3, 0)])
 for bPath in blue_paths:
   for oPath in orange_paths:
     if isValidSolution(bPath, oPath):
@@ -461,6 +428,28 @@ while len(to_visit) > 0:
 stageEnd = time()
 print 'Stage 2 done in', format_time(stageEnd-stageStart)
 stageStart = stageEnd
+# Stage 3: Find and print the optimal solutions.
 
-# S3: Build total costs
-# S4: Generate solution.
+min_both = (999, None)
+min_single = (999, None)
+
+for exit in exits_b:
+  bPath, oPath = exit
+  cost_single = path_combos_b[str(bPath)][str(oPath)]['pCost'][0]
+  cost_both = cost_single+path_combos_o[str(oPath)][str(bPath)]['cost'][0]
+  if cost_single[0] < min_single[0]:
+    min_single = cost_single
+  if cost_both[0] < min_both[0]:
+    min_both = cost_both
+
+for exit in exits_o:
+  bPath, oPath = exit
+  cost_single = path_combos_o[str(oPath)][str(bPath)]['pCost'][0]
+  cost_both = cost_single+path_combos_b[str(bPath)][str(oPath)]['cost'][0]
+  if cost_single[0] < min_single[0]:
+    min_single = cost_single
+  if cost_both[0] < min_both[0]:
+    min_both = cost_both
+
+print cost_single
+print cost_both
