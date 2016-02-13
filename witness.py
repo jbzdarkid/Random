@@ -1,5 +1,5 @@
 # Create a Path() class, define __hash__ and __cmp__ so that it can be used as a dictionary entry.
-# Create two isValidSolution() classes, one using caching, one using on-the-fly calculation. Time to see which is faster, live cache, dead cache, or otf.
+# Work isValidSolution() into stage 1 not stage 0.
 
 from Queue import Queue
 from threading import Lock, Thread # Threads are used for the queue of PartialSolutions.
@@ -347,8 +347,8 @@ q = Queue()
 stages = [None]
 
 # These are initialized separately because A. they aren't valid paths, and B. they need to have a children array defined (as a base case).
-path_combos_b = {'[(3, 4)]':{'[(3, 0)]':{'parents':[],'cost':None, 'pCost': 0}}}
-path_combos_o = {'[(3, 0)]':{'[(3, 4)]':{'parents':[],'cost':None, 'pCost': 0}}}
+path_combos_b = {'[(3, 4)]':{'[(3, 0)]':{'parents':[],'cost':None, 'pCost': (0, None)}}}
+path_combos_o = {'[(3, 0)]':{'[(3, 4)]':{'parents':[],'cost':None, 'pCost': (0, None)}}}
 # Stage 0: Calculate all blue and orange paths.
 stageStart = time()
 q.put(PartialSolution(root=('blue', [(3, 4)], [(3, 0)])))
@@ -383,14 +383,14 @@ while len(to_visit) > 0:
           path_combos_b[str(new_bPath)][str(oPath)]['parents'].append((bPath, oPath))
           path_combos_o[str(oPath)][str(new_bPath)]['parents'].append((bPath, oPath))
           if path_combos_o[str(oPath)][str(new_bPath)]['pCost'] == None:
-            path_combos_b[str(new_bPath)][str(oPath)]['pCost'] = path_combos_b[str(bPath)][str(oPath)]['pCost']+len(bPath)
-            path_combos_o[str(oPath)][str(new_bPath)]['pCost'] = path_combos_o[str(oPath)][str(bPath)]['pCost']+len(bPath)
+            path_combos_b[str(new_bPath)][str(oPath)]['pCost'] = (path_combos_b[str(bPath)][str(oPath)]['pCost'][0]+len(bPath), (bPath, oPath))
+            path_combos_o[str(oPath)][str(new_bPath)]['pCost'] = (path_combos_o[str(oPath)][str(bPath)]['pCost'][0]+len(bPath), (bPath, oPath))
             to_visit.append((new_bPath, oPath, 'blue'))
-          if path_combos_o[str(oPath)][str(bPath)]['pCost'] + len(bPath) < path_combos_o[str(oPath)][str(new_bPath)]['pCost']:
-            path_combos_b[str(new_bPath)][str(oPath)]['pCost'] = path_combos_b[str(bPath)][str(oPath)]['pCost']+len(bPath)
-            path_combos_o[str(oPath)][str(new_bPath)]['pCost'] = path_combos_o[str(oPath)][str(bPath)]['pCost']+len(bPath)
+          if path_combos_o[str(oPath)][str(bPath)]['pCost'][0] + len(bPath) < path_combos_o[str(oPath)][str(new_bPath)]['pCost'][0]:
+            path_combos_b[str(new_bPath)][str(oPath)]['pCost'] = (path_combos_b[str(bPath)][str(oPath)]['pCost'][0]+len(bPath), (bPath, oPath))
+            path_combos_o[str(oPath)][str(new_bPath)]['pCost'] = (path_combos_o[str(oPath)][str(bPath)]['pCost'][0]+len(bPath), (bPath, oPath))
           if new_bPath[-1] == (0, 3) and len(oPath) > 1: # Found a solution!
-            path_combos_b[str(new_bPath)][str(oPath)]['cost'] = (0, 0, None)
+            path_combos_b[str(new_bPath)][str(oPath)]['cost'] = (0, None)
             exits_b.append((new_bPath, oPath))
   if color == 'orange' or bPath[-1][1] == 4: # Blue path connects to orange side or we're on the orange side, look for a new orange path.
     if str(bPath) in path_combos_b:
@@ -401,14 +401,14 @@ while len(to_visit) > 0:
           path_combos_b[str(bPath)][str(new_oPath)]['parents'].append((bPath, oPath))
           path_combos_o[str(new_oPath)][str(bPath)]['parents'].append((bPath, oPath))
           if path_combos_b[str(bPath)][str(new_oPath)]['pCost'] == None:
-            path_combos_b[str(bPath)][str(new_oPath)]['pCost'] = path_combos_b[str(bPath)][str(oPath)]['pCost']+len(oPath)
-            path_combos_o[str(new_oPath)][str(bPath)]['pCost'] = path_combos_o[str(oPath)][str(bPath)]['pCost']+len(oPath)
+            path_combos_b[str(bPath)][str(new_oPath)]['pCost'] = (path_combos_b[str(bPath)][str(oPath)]['pCost'][0]+len(oPath), (bPath, oPath))
+            path_combos_o[str(new_oPath)][str(bPath)]['pCost'] = (path_combos_o[str(oPath)][str(bPath)]['pCost'][0]+len(oPath), (bPath, oPath))
             to_visit.append((bPath, new_oPath, 'orange'))
-          if path_combos_b[str(bPath)][str(oPath)]['pCost'] + len(oPath) < path_combos_b[str(bPath)][str(new_oPath)]['pCost']:
-            path_combos_b[str(bPath)][str(new_oPath)]['pCost'] = path_combos_b[str(bPath)][str(oPath)]['pCost']+len(oPath)
-            path_combos_o[str(new_oPath)][str(bPath)]['pCost'] = path_combos_o[str(oPath)][str(bPath)]['pCost']+len(oPath)
+          if path_combos_b[str(bPath)][str(oPath)]['pCost'][0] + len(oPath) < path_combos_b[str(bPath)][str(new_oPath)]['pCost'][0]:
+            path_combos_b[str(bPath)][str(new_oPath)]['pCost'] = (path_combos_b[str(bPath)][str(oPath)]['pCost'][0]+len(oPath), (bPath, oPath))
+            path_combos_o[str(new_oPath)][str(bPath)]['pCost'] = (path_combos_o[str(oPath)][str(bPath)]['pCost'][0]+len(oPath), (bPath, oPath))
           if new_oPath[-1] == (0, 3) and len(bPath) > 1: # Found a solution!
-            path_combos_o[str(new_oPath)][str(bPath)]['cost'] = (0, 0, None)
+            path_combos_o[str(new_oPath)][str(bPath)]['cost'] = (0, None)
             exits_o.append((bPath, new_oPath))
 
 stageEnd = time()
@@ -420,20 +420,16 @@ stageStart = stageEnd
 def update_cost(pPath, parent, cPath, child):
   if pPath[0] == cPath[0]: # Orange path was changed to make this connection
     if parent['cost'] == None:
-      parent['cost'] = (child['cost'][0]+1, child['cost'][1]+len(cPath[1]), cPath)
+      parent['cost'] = (child['cost'][0]+len(cPath[1]), cPath)
       return True
-    if parent['cost'][0] > child['cost'][0]:
-      parent['cost'] = (child['cost'][0]+1, child['cost'][1]+len(cPath[1]), cPath)
-    elif parent['cost'][0] == child['cost'][0] and parent['cost'][1] > child['cost'][1] + len(cPath[1]):
-      parent['cost'] = (child['cost'][0]+1, child['cost'][1]+len(cPath[1]), cPath)
+    if parent['cost'][0] > child['cost'][0] + len(cPath[1]):
+      parent['cost'] = (child['cost'][0]+len(cPath[1]), cPath)
   else: # Blue path was changed to make this connection
     if parent['cost'] == None:
-      parent['cost'] = (child['cost'][0]+1, child['cost'][1]+len(cPath[0]), cPath)
+      parent['cost'] = (child['cost'][0]+len(cPath[0]), cPath)
       return True
-    elif parent['cost'][0] > child['cost'][0]:
-      parent['cost'] = (child['cost'][0]+1, child['cost'][1]+len(cPath[0]), cPath)
-    elif parent['cost'][0] == child['cost'][0] and parent['cost'][1] > child['cost'][1] + len(cPath[0]):
-      parent['cost'] = (child['cost'][0]+1, child['cost'][1]+len(cPath[0]), cPath)
+    if parent['cost'][0] > child['cost'][0] + len(cPath[0]):
+      parent['cost'] = (child['cost'][0]+len(cPath[0]), cPath)
   return False
 
 # Calculates cost at each node to reach a blue solution
