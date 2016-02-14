@@ -437,19 +437,19 @@ for exit in exits_b:
   bPath, oPath = exit
   cost_single = path_combos_b[str(bPath)][str(oPath)]['pCost'][0]
   cost_both = cost_single+path_combos_o[str(oPath)][str(bPath)]['cost'][0]
-  if cost_single[0] < min_single[0]:
-    min_single = cost_single
-  if cost_both[0] < min_both[0]:
-    min_both = cost_both
+  if cost_single < min_single[0]:
+    min_single = (cost_single, exit)
+  if cost_both < min_both[0]:
+    min_both = (cost_both, exit)
 
 for exit in exits_o:
   bPath, oPath = exit
   cost_single = path_combos_o[str(oPath)][str(bPath)]['pCost'][0]
   cost_both = cost_single+path_combos_b[str(bPath)][str(oPath)]['cost'][0]
-  if cost_single[0] < min_single[0]:
-    min_single = cost_single
-  if cost_both[0] < min_both[0]:
-    min_both = cost_both
+  if cost_single < min_single[0]:
+    min_single = (cost_single, exit)
+  if cost_both < min_both[0]:
+    min_both = (cost_both, exit)
 
-print cost_single
-print cost_both
+print min_single # 16
+print min_both # 37
