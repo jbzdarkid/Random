@@ -1,9 +1,56 @@
-# I tried creating a custom Path() class, and implementing my own hash() function, but it's at least 30 seconds *slower* for even stage 0.
 # Work isValidSolution() into stage 1 not stage 0... May not work because I need to know which blue_paths are a valid start -- which involves doing all the work anyways.
 
 from collections import deque
 from time import time
-from copy import copy
+
+class Path():
+  def __init__(self, path):
+    if isinstance(path, list):
+      self.path = path
+    elif isinstance(path, tuple):
+      self.path = [path]
+    else:
+      raise TypeError('Path.__init__ called with: %s' % str(path))
+    self.sortedpath = sorted(self.path)
+
+  # Required for dictionary entry. If two paths are the same, their hashes must be the same.
+  def __hash__(self):
+    hash = 0
+    for point in self.path:
+      hash << 5 # Multiply by 32, which isn't quite 36 -- but a hash doesn't have to be unique
+      hash += point[1]<<3 + point[0] # (0-4)*8+(0-6) = (0-36)
+    return hash
+
+  # Required for dictionary entry.
+  def __eq__(self, other):
+    if len(self.sortedpath) != len(other.sortedpath):
+      return False
+    i = 0
+    while i < len(self.sortedpath):
+      if self.sortedpath[i] != other.sortedpath[i]:
+        return False
+      i += 1
+    return True
+
+  # Called with len()
+  def __len__(self):
+    return len(self.path)
+
+  # Called when trying to print.
+  def __repr__(self):
+    return 'Path(%s)' % repr(self.path)
+
+  # Returns if there is an overlap between the two paths
+  def collides(self, other):
+    i = j = 0
+    while i < len(self.sortedpath) and j < len(other.sortedpath):
+      if self.sortedpath[i] == other.sortedpath[j]:
+        return True
+      elif self.sortedpath[i] < other.sortedpath[j]:
+        i += 1
+      elif self.sortedpath[i] > other.sortedpath[j]:
+        j += 1
+    return False
 
 # Adds (b, c) to a=(x, y)
 def plus(a, b, c):
@@ -16,7 +63,6 @@ def plus(a, b, c):
 # 2. Steps forward need to not collide with other paths
 # 3. Steps forward need to be in bounds
 # 4. Steps forward need to respect the breaks in the board
-@profile
 def isValidConnection(color, blue_path, orange_path, dir):
   banned_connections = {
     (0,2):['down'],
@@ -32,7 +78,7 @@ def isValidConnection(color, blue_path, orange_path, dir):
     head = blue_path[-1]
     if len(blue_path) > 2:
       head2 = blue_path[-3]
-  if color == 'orange':
+  elif color == 'orange':
     head = orange_path[-1]
     if len(orange_path) > 2:
       head2 = orange_path[-3]
@@ -115,7 +161,6 @@ def isValidConnection(color, blue_path, orange_path, dir):
   return True
 
 # Convert seconds into a more human-readable time amount
-@profile
 def format_time(seconds):
   from math import floor
   if seconds < 1:
@@ -133,7 +178,6 @@ def format_time(seconds):
   return time_spent[:-2]
 
 # Find all valid blue and orange paths from a given base point
-@profile
 def findSolutions(base):
   to_visit = deque([base])
   solutions = []
@@ -145,59 +189,50 @@ def findSolutions(base):
       head = orange_path[-1]
     if head in [(0, 0), (6, 0), (0, 3), (0, 4), (6, 4)]: # Valid exits
       if color == 'blue':
-        solutions.append(blue_path)
+        solutions.append(Path(blue_path))
       elif color == 'orange':
-        solutions.append(orange_path)
+        solutions.append(Path(orange_path))
     if isValidConnection(color, blue_path, orange_path, 'left'):
-      newSolution = (color, copy(blue_path), copy(orange_path))
       if color == 'blue':
-        newSolution[1].append(plus(head, -1, 0))
+        to_visit.append((color, blue_path + [plus(head, -1, 0)], orange_path))
       elif color == 'orange':
-        newSolution[2].append(plus(head, -1, 0))
-      to_visit.append(newSolution)
+        to_visit.append((color, blue_path, orange_path + [plus(head, -1, 0)]))
     if isValidConnection(color, blue_path, orange_path, 'right'):
-      newSolution = (color, copy(blue_path), copy(orange_path))
       if color == 'blue':
-        newSolution[1].append(plus(head, 1, 0))
+        to_visit.append((color, blue_path + [plus(head, 1, 0)], orange_path))
       elif color == 'orange':
-        newSolution[2].append(plus(head, 1, 0))
-      to_visit.append(newSolution)
+        to_visit.append((color, blue_path, orange_path + [plus(head, 1, 0)]))
     if isValidConnection(color, blue_path, orange_path, 'up'):
-      newSolution = (color, copy(blue_path), copy(orange_path))
       if color == 'blue':
-        newSolution[1].append(plus(head, 0, -1))
+        to_visit.append((color, blue_path + [plus(head, 0, -1)], orange_path))
       elif color == 'orange':
-        newSolution[2].append(plus(head, 0, -1))
-      to_visit.append(newSolution)
+        to_visit.append((color, blue_path, orange_path + [plus(head, 0, -1)]))
     if isValidConnection(color, blue_path, orange_path, 'down'):
-      newSolution = (color, copy(blue_path), copy(orange_path))
       if color == 'blue':
-        newSolution[1].append(plus(head, 0, 1))
+        to_visit.append((color, blue_path + [plus(head, 0, 1)], orange_path))
       elif color == 'orange':
-        newSolution[2].append(plus(head, 0, 1))
-      to_visit.append(newSolution)
+        to_visit.append((color, blue_path, orange_path + [plus(head, 0, 1)]))
   return solutions
 
 # Check if a square is contiguous to a square in the given direction.
-@profile
 def isConnected(blue_path, orange_path, square, dir):
   x, y = square
   if dir == 'left':
     if x == 0:
       return False
     try:
-      index = blue_path.index((x, y))
-      if index > 0 and blue_path[index-1] == (x, y+1):
+      index = blue_path.path.index((x, y))
+      if index > 0 and blue_path.path[index-1] == (x, y+1):
         return False
-      if index < len(blue_path)-1 and blue_path[index+1] == (x, y+1):
+      if index < len(blue_path)-1 and blue_path.path[index+1] == (x, y+1):
         return False
     except ValueError:
       pass
     try:
-      index = orange_path.index((x, y))
-      if index > 0 and orange_path[index-1] == (x, y+1):
+      index = orange_path.path.index((x, y))
+      if index > 0 and orange_path.path[index-1] == (x, y+1):
         return False
-      if index < len(orange_path)-1 and orange_path[index+1] == (x, y+1):
+      if index < len(orange_path)-1 and orange_path.path[index+1] == (x, y+1):
         return False
     except ValueError:
       pass
@@ -205,18 +240,18 @@ def isConnected(blue_path, orange_path, square, dir):
     if y == 0:
       return False
     try:
-      index = blue_path.index((x, y))
-      if index > 0 and blue_path[index-1] == (x+1, y):
+      index = blue_path.path.index((x, y))
+      if index > 0 and blue_path.path[index-1] == (x+1, y):
         return False
-      if index < len(blue_path)-1 and blue_path[index+1] == (x+1, y):
+      if index < len(blue_path)-1 and blue_path.path[index+1] == (x+1, y):
         return False
     except ValueError:
       pass
     try:
-      index = orange_path.index((x, y))
-      if index > 0 and orange_path[index-1] == (x+1, y):
+      index = orange_path.path.index((x, y))
+      if index > 0 and orange_path.path[index-1] == (x+1, y):
         return False
-      if index < len(orange_path)-1 and orange_path[index+1] == (x+1, y):
+      if index < len(orange_path)-1 and orange_path.path[index+1] == (x+1, y):
         return False
     except ValueError:
       pass
@@ -224,18 +259,18 @@ def isConnected(blue_path, orange_path, square, dir):
     if x == 5:
       return False
     try:
-      index = blue_path.index((x+1, y+1))
-      if index > 0 and blue_path[index-1] == (x+1, y):
+      index = blue_path.path.index((x+1, y+1))
+      if index > 0 and blue_path.path[index-1] == (x+1, y):
         return False
-      if index < len(blue_path)-1 and blue_path[index+1] == (x+1, y):
+      if index < len(blue_path)-1 and blue_path.path[index+1] == (x+1, y):
         return False
     except ValueError:
       pass
     try:
-      index = orange_path.index((x+1, y+1))
-      if index > 0 and orange_path[index-1] == (x+1, y):
+      index = orange_path.path.index((x+1, y+1))
+      if index > 0 and orange_path.path[index-1] == (x+1, y):
         return False
-      if index < len(orange_path)-1 and orange_path[index+1] == (x+1, y):
+      if index < len(orange_path)-1 and orange_path.path[index+1] == (x+1, y):
         return False
     except ValueError:
       pass
@@ -243,30 +278,29 @@ def isConnected(blue_path, orange_path, square, dir):
     if y == 3:
       return False
     try:
-      index = blue_path.index((x+1, y+1))
-      if index > 0 and blue_path[index-1] == (x, y+1):
+      index = blue_path.path.index((x+1, y+1))
+      if index > 0 and blue_path.path[index-1] == (x, y+1):
         return False
-      if index < len(blue_path)-1 and blue_path[index+1] == (x, y+1):
+      if index < len(blue_path)-1 and blue_path.path[index+1] == (x, y+1):
         return False
     except ValueError:
       pass
     try:
-      index = orange_path.index((x+1, y+1))
-      if index > 0 and orange_path[index-1] == (x, y+1):
+      index = orange_path.path.index((x+1, y+1))
+      if index > 0 and orange_path.path[index-1] == (x, y+1):
         return False
-      if index < len(orange_path)-1 and orange_path[index+1] == (x, y+1):
+      if index < len(orange_path)-1 and orange_path.path[index+1] == (x, y+1):
         return False
     except ValueError:
       pass
   return True
 
-@profile
 def isValidSolution(blue_path, orange_path):
-  # This is o(n^2) and can be sped up to o(n) if the lists are sorted.
-  for b in blue_path:
-    for o in orange_path:
-      if b == o:
-        return False
+  # Given n paths of length m each:
+  # Comparing naively is O(n^2 * m^2)
+  # Sorting first costs O(n * log(m)) and comparing is then O(n^2 * m)
+  if blue_path.collides(orange_path):
+    return False
   # For region definitions, we use square centers rather than square corners. The range for stars is thus [0-5, 0-3]
   stars = [(2, 0), (3, 1), (0, 2), (0, 3), (5, 2), (5, 3)]
   for i in range(3): # There are 6 stars, and each time we find one it needs to remove exactly 1 other star.
@@ -320,76 +354,79 @@ def isValidSolution(blue_path, orange_path):
     j += 1
   return True
 
-# Stage 0: Calculate all blue and orange paths.
+# Stage 0: Calculate all valid blue and orange paths.
 stageStart = time()
 blue_paths = findSolutions(('blue', [(3, 4)], [(3, 0)]))
-blue_paths.append([(3, 4)]) # Added in for the start point
+blue_paths.append(Path((3, 4))) # Added in for the start point
 orange_paths = findSolutions(('orange', [(3, 4)], [(3, 0)]))
-orange_paths.append([(3, 0)]) # Added in for the start point
+orange_paths.append(Path((3, 0))) # Added in for the start point
 # These are initialized separately because A. they aren't valid paths, and B. they need to have a children array defined (as a base case).
-path_combos_b = {'[(3, 4)]':{'[(3, 0)]':{'parents':[],'cost':None, 'pCost': (0, None)}}}
-path_combos_o = {'[(3, 0)]':{'[(3, 4)]':{'parents':[],'cost':None, 'pCost': (0, None)}}}
+path_combos_b = {Path((3, 4)):{Path((3, 0)):{'parents':[],'cost':None, 'pCost': (0, None)}}}
+path_combos_o = {Path((3, 0)):{Path((3, 4)):{'parents':[],'cost':None, 'pCost': (0, None)}}}
 for bPath in blue_paths:
   for oPath in orange_paths:
     if isValidSolution(bPath, oPath):
-      if str(bPath) not in path_combos_b:
-        path_combos_b[str(bPath)] = {}
-      path_combos_b[str(bPath)][str(oPath)] = {'parents':[], 'cost':None, 'pCost':None}
-      if str(oPath) not in path_combos_o:
-        path_combos_o[str(oPath)] = {}
-      path_combos_o[str(oPath)][str(bPath)] = {'parents':[], 'cost':None, 'pCost':None}
+      if bPath not in path_combos_b:
+        path_combos_b[bPath] = {}
+      path_combos_b[bPath][oPath] = {'parents':[], 'cost':None, 'pCost':None}
+      if oPath not in path_combos_o:
+        path_combos_o[oPath] = {}
+      path_combos_o[oPath][bPath] = {'parents':[], 'cost':None, 'pCost':None}
 stageEnd = time()
 print 'Stage 0 done in', format_time(stageEnd-stageStart)
 stageStart = stageEnd
+
+# Stage 1: Create a tree through combos which connects all the possible paths (from start)
 exits_b = []
 exits_o = []
-to_visit = deque([([(3, 4)], [(3, 0)], 'blue')]) # Base starting point: Each path is length 1, and we start on the blue side.
+to_visit = deque([(Path((3, 4)), Path((3, 0)), 'blue')]) # Base starting point: Each path is length 1, and we start on the blue side.
 while len(to_visit) > 0:
   bPath, oPath, color = to_visit.popleft()
-  if color == 'blue' or oPath[-1][1] == 0: # Orange path connects to blue side or we're on the blue side, look for a new blue path.
-    if str(oPath) in path_combos_o:
+  if color == 'blue' or oPath.path[-1][1] == 0: # Orange path connects to blue side or we're on the blue side, look for a new blue path.
+    if oPath not in path_combos_o:
+      raise Exception
+    if oPath in path_combos_o:
       for new_bPath in blue_paths:
         if new_bPath == bPath:
           continue
-        if str(new_bPath) in path_combos_o[str(oPath)]: # Valid path
-          path_combos_b[str(new_bPath)][str(oPath)]['parents'].append((bPath, oPath))
-          path_combos_o[str(oPath)][str(new_bPath)]['parents'].append((bPath, oPath))
-          if path_combos_o[str(oPath)][str(new_bPath)]['pCost'] == None:
-            path_combos_b[str(new_bPath)][str(oPath)]['pCost'] = (path_combos_b[str(bPath)][str(oPath)]['pCost'][0]+len(bPath), (bPath, oPath))
-            path_combos_o[str(oPath)][str(new_bPath)]['pCost'] = (path_combos_o[str(oPath)][str(bPath)]['pCost'][0]+len(bPath), (bPath, oPath))
+        if new_bPath in path_combos_o[oPath]: # Valid path
+          path_combos_b[new_bPath][oPath]['parents'].append((bPath, oPath))
+          path_combos_o[oPath][new_bPath]['parents'].append((bPath, oPath))
+          if path_combos_o[oPath][new_bPath]['pCost'] == None:
+            path_combos_b[new_bPath][oPath]['pCost'] = (path_combos_b[bPath][oPath]['pCost'][0]+len(bPath), (bPath, oPath))
+            path_combos_o[oPath][new_bPath]['pCost'] = (path_combos_o[oPath][bPath]['pCost'][0]+len(bPath), (bPath, oPath))
             to_visit.append((new_bPath, oPath, 'blue'))
-          if path_combos_o[str(oPath)][str(bPath)]['pCost'][0] + len(bPath) < path_combos_o[str(oPath)][str(new_bPath)]['pCost'][0]:
-            path_combos_b[str(new_bPath)][str(oPath)]['pCost'] = (path_combos_b[str(bPath)][str(oPath)]['pCost'][0]+len(bPath), (bPath, oPath))
-            path_combos_o[str(oPath)][str(new_bPath)]['pCost'] = (path_combos_o[str(oPath)][str(bPath)]['pCost'][0]+len(bPath), (bPath, oPath))
-          if new_bPath[-1] == (0, 3) and len(oPath) > 1: # Found a solution!
-            path_combos_b[str(new_bPath)][str(oPath)]['cost'] = (0, None)
+          if path_combos_o[oPath][bPath]['pCost'][0] + len(bPath) < path_combos_o[oPath][new_bPath]['pCost'][0]:
+            path_combos_b[new_bPath][oPath]['pCost'] = (path_combos_b[bPath][oPath]['pCost'][0]+len(bPath), (bPath, oPath))
+            path_combos_o[oPath][new_bPath]['pCost'] = (path_combos_o[oPath][bPath]['pCost'][0]+len(bPath), (bPath, oPath))
+          if new_bPath.path[-1] == (0, 3) and len(oPath) > 1: # Found a solution!
+            path_combos_b[new_bPath][oPath]['cost'] = (0, None)
             exits_b.append((new_bPath, oPath))
-  if color == 'orange' or bPath[-1][1] == 4: # Blue path connects to orange side or we're on the orange side, look for a new orange path.
-    if str(bPath) in path_combos_b:
+  elif color == 'orange' or bPath.path[-1][1] == 4: # Blue path connects to orange side or we're on the orange side, look for a new orange path.
+    if bPath in path_combos_b:
       for new_oPath in orange_paths:
         if new_oPath == oPath:
           continue
-        if str(new_oPath) in path_combos_b[str(bPath)]: # Valid path
-          path_combos_b[str(bPath)][str(new_oPath)]['parents'].append((bPath, oPath))
-          path_combos_o[str(new_oPath)][str(bPath)]['parents'].append((bPath, oPath))
-          if path_combos_b[str(bPath)][str(new_oPath)]['pCost'] == None:
-            path_combos_b[str(bPath)][str(new_oPath)]['pCost'] = (path_combos_b[str(bPath)][str(oPath)]['pCost'][0]+len(oPath), (bPath, oPath))
-            path_combos_o[str(new_oPath)][str(bPath)]['pCost'] = (path_combos_o[str(oPath)][str(bPath)]['pCost'][0]+len(oPath), (bPath, oPath))
+        if new_oPath in path_combos_b[bPath]: # Valid path
+          path_combos_b[bPath][new_oPath]['parents'].append((bPath, oPath))
+          path_combos_o[new_oPath][bPath]['parents'].append((bPath, oPath))
+          if path_combos_b[bPath][new_oPath]['pCost'] == None:
+            path_combos_b[bPath][new_oPath]['pCost'] = (path_combos_b[bPath][oPath]['pCost'][0]+len(oPath), (bPath, oPath))
+            path_combos_o[new_oPath][bPath]['pCost'] = (path_combos_o[oPath][bPath]['pCost'][0]+len(oPath), (bPath, oPath))
             to_visit.append((bPath, new_oPath, 'orange'))
-          if path_combos_b[str(bPath)][str(oPath)]['pCost'][0] + len(oPath) < path_combos_b[str(bPath)][str(new_oPath)]['pCost'][0]:
-            path_combos_b[str(bPath)][str(new_oPath)]['pCost'] = (path_combos_b[str(bPath)][str(oPath)]['pCost'][0]+len(oPath), (bPath, oPath))
-            path_combos_o[str(new_oPath)][str(bPath)]['pCost'] = (path_combos_o[str(oPath)][str(bPath)]['pCost'][0]+len(oPath), (bPath, oPath))
-          if new_oPath[-1] == (0, 3) and len(bPath) > 1: # Found a solution!
-            path_combos_o[str(new_oPath)][str(bPath)]['cost'] = (0, None)
+          if path_combos_b[bPath][oPath]['pCost'][0] + len(oPath) < path_combos_b[bPath][new_oPath]['pCost'][0]:
+            path_combos_b[bPath][new_oPath]['pCost'] = (path_combos_b[bPath][oPath]['pCost'][0]+len(oPath), (bPath, oPath))
+            path_combos_o[new_oPath][bPath]['pCost'] = (path_combos_o[oPath][bPath]['pCost'][0]+len(oPath), (bPath, oPath))
+          if new_oPath.path[-1] == (0, 3) and len(bPath) > 1: # Found a solution!
+            path_combos_o[new_oPath][bPath]['cost'] = (0, None)
             exits_o.append((bPath, new_oPath))
 
 stageEnd = time()
 print 'Stage 1 done in', format_time(stageEnd-stageStart)
 stageStart = stageEnd
-# Stage 2: Calculate distance to exit at each node
 
+# Stage 2: Calculate distance to exit at each node
 # pPath = (bPath, oPath) for the parent
-@profile
 def update_cost(pPath, parent, cPath, child):
   if pPath[0] == cPath[0]: # Orange path was changed to make this connection
     if parent['cost'] == None:
@@ -409,12 +446,12 @@ def update_cost(pPath, parent, cPath, child):
 to_visit = deque(exits_b)
 while len(to_visit) > 0:
   bPath, oPath = to_visit.popleft()
-  for parent in path_combos_b[str(bPath)][str(oPath)]['parents']:
+  for parent in path_combos_b[bPath][oPath]['parents']:
     if update_cost(
       parent,
-      path_combos_b[str(parent[0])][str(parent[1])],
+      path_combos_b[parent[0]][parent[1]],
       (bPath, oPath),
-      path_combos_b[str(bPath)][str(oPath)]
+      path_combos_b[bPath][oPath]
     ):
       to_visit.append(parent)
 
@@ -422,12 +459,12 @@ while len(to_visit) > 0:
 to_visit = deque(exits_o)
 while len(to_visit) > 0:
   bPath, oPath = to_visit.popleft()
-  for parent in path_combos_o[str(oPath)][str(bPath)]['parents']:
+  for parent in path_combos_o[oPath][bPath]['parents']:
     if update_cost(
       parent,
-      path_combos_o[str(parent[1])][str(parent[0])],
+      path_combos_o[parent[1]][parent[0]],
       (bPath, oPath),
-      path_combos_o[str(oPath)][str(bPath)]
+      path_combos_o[oPath][bPath]
     ):
       to_visit.append(parent)
 
@@ -441,8 +478,8 @@ min_single = (999, None)
 
 for exit in exits_b:
   bPath, oPath = exit
-  cost_single = path_combos_b[str(bPath)][str(oPath)]['pCost'][0]
-  cost_both = cost_single+path_combos_o[str(oPath)][str(bPath)]['cost'][0]
+  cost_single = path_combos_b[bPath][oPath]['pCost'][0]
+  cost_both = cost_single+path_combos_o[oPath][bPath]['cost'][0]
   if cost_single < min_single[0]:
     min_single = (cost_single, exit)
   if cost_both < min_both[0]:
@@ -450,12 +487,21 @@ for exit in exits_b:
 
 for exit in exits_o:
   bPath, oPath = exit
-  cost_single = path_combos_o[str(oPath)][str(bPath)]['pCost'][0]
-  cost_both = cost_single+path_combos_b[str(bPath)][str(oPath)]['cost'][0]
+  cost_single = path_combos_o[oPath][bPath]['pCost'][0]
+  cost_both = cost_single+path_combos_b[bPath][oPath]['cost'][0]
   if cost_single < min_single[0]:
     min_single = (cost_single, exit)
   if cost_both < min_both[0]:
     min_both = (cost_both, exit)
 
-print min_single # 16
-print min_both # 37
+print 'Minimum cost for a single exit:', min_single[0]
+node = min_single[1]
+while node is not None:
+  print node
+  node = path_combos_b[node[0]][node[1]]['pCost'][1]
+
+print 'Minimum cost for a both exits:', min_both[0]
+node = min_both[1]
+while node is not None:
+  print node
+  node = path_combos_b[node[0]][node[1]]['pCost'][1]
