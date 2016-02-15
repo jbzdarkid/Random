@@ -13,6 +13,6 @@ cp ~/Library/Application\ Support/Steam/steamapps/common/Team\ Fortress\ 2/tf/cf
 cp ~/Library/Application\ Support/Steam/steamapps/common/Counter-Strike\ Global\ Offensive/csgo/cfg/autoexec.cfg csgo/autoexec.cfg
 cp ~/Library/Application\ Support/Steam/steamapps/common/Left\ 4\ Dead\ 2/left4dead2/cfg/autoexec.cfg l4d2/autoexec.cfg
 
-git add .
+git add ./*
 git commit -m "Auto-updating scripts on $(date)"
 git push
