@@ -361,17 +361,15 @@ blue_paths.append(Path((3, 4))) # Added in for the start point
 orange_paths = findSolutions(('orange', [(3, 4)], [(3, 0)]))
 orange_paths.append(Path((3, 0))) # Added in for the start point
 # These are initialized separately because A. they aren't valid paths, and B. they need to have a children array defined (as a base case).
-path_combos_b = {Path((3, 4)):{Path((3, 0)):{'parents':[],'cost':None, 'pCost': (0, None)}}}
-path_combos_o = {Path((3, 0)):{Path((3, 4)):{'parents':[],'cost':None, 'pCost': (0, None)}}}
+path_combos = {Path((3, 4)):{Path((3, 0)):{'parents':[], 'bCost':None, 'oCost':None, 'pCost': (0, None)}}}
 for bPath in blue_paths:
   for oPath in orange_paths:
     if isValidSolution(bPath, oPath):
-      if bPath not in path_combos_b:
-        path_combos_b[bPath] = {}
-      path_combos_b[bPath][oPath] = {'parents':[], 'cost':None, 'pCost':None}
-      if oPath not in path_combos_o:
-        path_combos_o[oPath] = {}
-      path_combos_o[oPath][bPath] = {'parents':[], 'cost':None, 'pCost':None}
+      if bPath not in path_combos:
+        path_combos[bPath] = {}
+      # if oPath in path_combos[bPath]:
+      #   raise Exception
+      path_combos[bPath][oPath] = {'parents':[], 'bCost':None, 'oCost':None, 'pCost':None}
 stageEnd = time()
 print 'Stage 0 done in', format_time(stageEnd-stageStart)
 stageStart = stageEnd
@@ -383,41 +381,34 @@ to_visit = deque([(Path((3, 4)), Path((3, 0)), 'blue')]) # Base starting point: 
 while len(to_visit) > 0:
   bPath, oPath, color = to_visit.popleft()
   if color == 'blue' or oPath.path[-1][1] == 0: # Orange path connects to blue side or we're on the blue side, look for a new blue path.
-    if oPath not in path_combos_o:
-      raise Exception
-    if oPath in path_combos_o:
-      for new_bPath in blue_paths:
-        if new_bPath == bPath:
-          continue
-        if new_bPath in path_combos_o[oPath]: # Valid path
-          path_combos_b[new_bPath][oPath]['parents'].append((bPath, oPath))
-          path_combos_o[oPath][new_bPath]['parents'].append((bPath, oPath))
-          if path_combos_o[oPath][new_bPath]['pCost'] == None:
-            path_combos_b[new_bPath][oPath]['pCost'] = (path_combos_b[bPath][oPath]['pCost'][0]+len(bPath), (bPath, oPath))
-            path_combos_o[oPath][new_bPath]['pCost'] = (path_combos_o[oPath][bPath]['pCost'][0]+len(bPath), (bPath, oPath))
-            to_visit.append((new_bPath, oPath, 'blue'))
-          if path_combos_o[oPath][bPath]['pCost'][0] + len(bPath) < path_combos_o[oPath][new_bPath]['pCost'][0]:
-            path_combos_b[new_bPath][oPath]['pCost'] = (path_combos_b[bPath][oPath]['pCost'][0]+len(bPath), (bPath, oPath))
-            path_combos_o[oPath][new_bPath]['pCost'] = (path_combos_o[oPath][bPath]['pCost'][0]+len(bPath), (bPath, oPath))
-          if new_bPath.path[-1] == (0, 3) and len(oPath) > 1: # Found a solution!
-            path_combos_b[new_bPath][oPath]['cost'] = (0, None)
-            exits_b.append((new_bPath, oPath))
+    for new_bPath in blue_paths:
+      if new_bPath not in path_combos:
+        continue
+      if new_bPath == bPath:
+        continue
+      if oPath in path_combos[new_bPath]: # Valid path
+        path_combos[new_bPath][oPath]['parents'].append((bPath, oPath))
+        if path_combos[new_bPath][oPath]['pCost'] == None:
+          path_combos[new_bPath][oPath]['pCost'] = (path_combos[bPath][oPath]['pCost'][0]+len(bPath), (bPath, oPath))
+          to_visit.append((new_bPath, oPath, 'blue'))
+        if path_combos[bPath][oPath]['pCost'][0] + len(bPath) < path_combos[new_bPath][oPath]['pCost'][0]:
+          path_combos[new_bPath][oPath]['pCost'] = (path_combos[bPath][oPath]['pCost'][0]+len(bPath), (bPath, oPath))
+        if new_bPath.path[-1] == (0, 3) and len(oPath) > 1: # Found a solution!
+          path_combos[new_bPath][oPath]['bCost'] = (0, None)
+          exits_b.append((new_bPath, oPath))
   if color == 'orange' or bPath.path[-1][1] == 4: # Blue path connects to orange side or we're on the orange side, look for a new orange path.
     for new_oPath in orange_paths:
       if new_oPath == oPath:
         continue
-      if new_oPath in path_combos_b[bPath]: # Valid path
-        path_combos_b[bPath][new_oPath]['parents'].append((bPath, oPath))
-        path_combos_o[new_oPath][bPath]['parents'].append((bPath, oPath))
-        if path_combos_b[bPath][new_oPath]['pCost'] == None:
-          path_combos_b[bPath][new_oPath]['pCost'] = (path_combos_b[bPath][oPath]['pCost'][0]+len(oPath), (bPath, oPath))
-          path_combos_o[new_oPath][bPath]['pCost'] = (path_combos_o[oPath][bPath]['pCost'][0]+len(oPath), (bPath, oPath))
+      if new_oPath in path_combos[bPath]: # Valid path
+        path_combos[bPath][new_oPath]['parents'].append((bPath, oPath))
+        if path_combos[bPath][new_oPath]['pCost'] == None:
+          path_combos[bPath][new_oPath]['pCost'] = (path_combos[bPath][oPath]['pCost'][0]+len(oPath), (bPath, oPath))
           to_visit.append((bPath, new_oPath, 'orange'))
-        if path_combos_b[bPath][oPath]['pCost'][0] + len(oPath) < path_combos_b[bPath][new_oPath]['pCost'][0]:
-          path_combos_b[bPath][new_oPath]['pCost'] = (path_combos_b[bPath][oPath]['pCost'][0]+len(oPath), (bPath, oPath))
-          path_combos_o[new_oPath][bPath]['pCost'] = (path_combos_o[oPath][bPath]['pCost'][0]+len(oPath), (bPath, oPath))
+        if path_combos[bPath][oPath]['pCost'][0] + len(oPath) < path_combos[bPath][new_oPath]['pCost'][0]:
+          path_combos[bPath][new_oPath]['pCost'] = (path_combos[bPath][oPath]['pCost'][0]+len(oPath), (bPath, oPath))
         if new_oPath.path[-1] == (0, 3) and len(bPath) > 1: # Found a solution!
-          path_combos_o[new_oPath][bPath]['cost'] = (0, None)
+          path_combos[bPath][new_oPath]['oCost'] = (0, None)
           exits_o.append((bPath, new_oPath))
 
 stageEnd = time()
@@ -425,46 +416,37 @@ print 'Stage 1 done in', format_time(stageEnd-stageStart)
 stageStart = stageEnd
 
 # Stage 2: Calculate distance to exit at each node
-# pPath = (bPath, oPath) for the parent
-def update_cost(pPath, parent, cPath, child):
-  if pPath[0] == cPath[0]: # Orange path was changed to make this connection
-    if parent['cost'] == None:
-      parent['cost'] = (child['cost'][0]+len(cPath[1]), cPath)
+def update_cost(cost, parent, child):
+  parent_cost = path_combos[parent[0]][parent[1]][cost]
+  child_cost = path_combos[child[0]][child[1]][cost]
+  if parent[0] == child[0]: # Orange path was changed to make this connection
+    if parent_cost == None:
+      path_combos[parent[0]][parent[1]][cost] = (child_cost[0]+len(child[1]), child)
       return True
-    if parent['cost'][0] > child['cost'][0] + len(cPath[1]):
-      parent['cost'] = (child['cost'][0]+len(cPath[1]), cPath)
+    if parent_cost[0] > child_cost[0] + len(child[1]):
+      path_combos[parent[0]][parent[1]][cost] = (child_cost[0]+len(child[1]), child)
   else: # Blue path was changed to make this connection
-    if parent['cost'] == None:
-      parent['cost'] = (child['cost'][0]+len(cPath[0]), cPath)
+    if parent_cost == None:
+      path_combos[parent[0]][parent[1]][cost] = (child_cost[0]+len(child[0]), child)
       return True
-    if parent['cost'][0] > child['cost'][0] + len(cPath[0]):
-      parent['cost'] = (child['cost'][0]+len(cPath[0]), cPath)
+    if parent_cost[0] > child_cost[0] + len(child[0]):
+      path_combos[parent[0]][parent[1]][cost] = (child_cost[0]+len(child[0]), child)
   return False
 
 # Calculates cost at each node to reach a blue solution
 to_visit = deque(exits_b)
 while len(to_visit) > 0:
   bPath, oPath = to_visit.popleft()
-  for parent in path_combos_b[bPath][oPath]['parents']:
-    if update_cost(
-      parent,
-      path_combos_b[parent[0]][parent[1]],
-      (bPath, oPath),
-      path_combos_b[bPath][oPath]
-    ):
+  for parent in path_combos[bPath][oPath]['parents']:
+    if update_cost('bCost', parent, (bPath, oPath)):
       to_visit.append(parent)
 
 # Calculates cost at each node to reach an orange solution
 to_visit = deque(exits_o)
 while len(to_visit) > 0:
   bPath, oPath = to_visit.popleft()
-  for parent in path_combos_o[oPath][bPath]['parents']:
-    if update_cost(
-      parent,
-      path_combos_o[parent[1]][parent[0]],
-      (bPath, oPath),
-      path_combos_o[oPath][bPath]
-    ):
+  for parent in path_combos[bPath][oPath]['parents']:
+    if update_cost('oCost', parent, (bPath, oPath)):
       to_visit.append(parent)
 
 stageEnd = time()
@@ -477,8 +459,8 @@ min_single = (999, None)
 
 for exit in exits_b:
   bPath, oPath = exit
-  cost_single = path_combos_b[bPath][oPath]['pCost'][0]
-  cost_both = cost_single+path_combos_o[oPath][bPath]['cost'][0]
+  cost_single = path_combos[bPath][oPath]['pCost'][0]
+  cost_both = cost_single+path_combos[bPath][oPath]['oCost'][0]
   if cost_single < min_single[0]:
     min_single = (cost_single, exit)
   if cost_both < min_both[0]:
@@ -486,8 +468,8 @@ for exit in exits_b:
 
 for exit in exits_o:
   bPath, oPath = exit
-  cost_single = path_combos_o[oPath][bPath]['pCost'][0]
-  cost_both = cost_single+path_combos_b[bPath][oPath]['cost'][0]
+  cost_single = path_combos[bPath][oPath]['pCost'][0]
+  cost_both = cost_single+path_combos[bPath][oPath]['bCost'][0]
   if cost_single < min_single[0]:
     min_single = (cost_single, exit)
   if cost_both < min_both[0]:
@@ -497,10 +479,10 @@ print 'Minimum cost for a single exit:', min_single[0]
 node = min_single[1]
 while node is not None:
   print node
-  node = path_combos_b[node[0]][node[1]]['pCost'][1]
+  node = path_combos[node[0]][node[1]]['pCost'][1]
 
 print 'Minimum cost for a both exits:', min_both[0]
 node = min_both[1]
 while node is not None:
   print node
-  node = path_combos_b[node[0]][node[1]]['pCost'][1]
+  node = path_combos[node[0]][node[1]]['pCost'][1]
