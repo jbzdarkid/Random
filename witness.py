@@ -402,7 +402,7 @@ while len(to_visit) > 0:
           if new_bPath.path[-1] == (0, 3) and len(oPath) > 1: # Found a solution!
             path_combos_b[new_bPath][oPath]['cost'] = (0, None)
             exits_b.append((new_bPath, oPath))
-  elif color == 'orange' or bPath.path[-1][1] == 4: # Blue path connects to orange side or we're on the orange side, look for a new orange path.
+  if color == 'orange' or bPath.path[-1][1] == 4: # Blue path connects to orange side or we're on the orange side, look for a new orange path.
     if bPath in path_combos_b:
       for new_oPath in orange_paths:
         if new_oPath == oPath:
