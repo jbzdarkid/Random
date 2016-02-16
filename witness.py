@@ -403,23 +403,22 @@ while len(to_visit) > 0:
             path_combos_b[new_bPath][oPath]['cost'] = (0, None)
             exits_b.append((new_bPath, oPath))
   if color == 'orange' or bPath.path[-1][1] == 4: # Blue path connects to orange side or we're on the orange side, look for a new orange path.
-    if bPath in path_combos_b:
-      for new_oPath in orange_paths:
-        if new_oPath == oPath:
-          continue
-        if new_oPath in path_combos_b[bPath]: # Valid path
-          path_combos_b[bPath][new_oPath]['parents'].append((bPath, oPath))
-          path_combos_o[new_oPath][bPath]['parents'].append((bPath, oPath))
-          if path_combos_b[bPath][new_oPath]['pCost'] == None:
-            path_combos_b[bPath][new_oPath]['pCost'] = (path_combos_b[bPath][oPath]['pCost'][0]+len(oPath), (bPath, oPath))
-            path_combos_o[new_oPath][bPath]['pCost'] = (path_combos_o[oPath][bPath]['pCost'][0]+len(oPath), (bPath, oPath))
-            to_visit.append((bPath, new_oPath, 'orange'))
-          if path_combos_b[bPath][oPath]['pCost'][0] + len(oPath) < path_combos_b[bPath][new_oPath]['pCost'][0]:
-            path_combos_b[bPath][new_oPath]['pCost'] = (path_combos_b[bPath][oPath]['pCost'][0]+len(oPath), (bPath, oPath))
-            path_combos_o[new_oPath][bPath]['pCost'] = (path_combos_o[oPath][bPath]['pCost'][0]+len(oPath), (bPath, oPath))
-          if new_oPath.path[-1] == (0, 3) and len(bPath) > 1: # Found a solution!
-            path_combos_o[new_oPath][bPath]['cost'] = (0, None)
-            exits_o.append((bPath, new_oPath))
+    for new_oPath in orange_paths:
+      if new_oPath == oPath:
+        continue
+      if new_oPath in path_combos_b[bPath]: # Valid path
+        path_combos_b[bPath][new_oPath]['parents'].append((bPath, oPath))
+        path_combos_o[new_oPath][bPath]['parents'].append((bPath, oPath))
+        if path_combos_b[bPath][new_oPath]['pCost'] == None:
+          path_combos_b[bPath][new_oPath]['pCost'] = (path_combos_b[bPath][oPath]['pCost'][0]+len(oPath), (bPath, oPath))
+          path_combos_o[new_oPath][bPath]['pCost'] = (path_combos_o[oPath][bPath]['pCost'][0]+len(oPath), (bPath, oPath))
+          to_visit.append((bPath, new_oPath, 'orange'))
+        if path_combos_b[bPath][oPath]['pCost'][0] + len(oPath) < path_combos_b[bPath][new_oPath]['pCost'][0]:
+          path_combos_b[bPath][new_oPath]['pCost'] = (path_combos_b[bPath][oPath]['pCost'][0]+len(oPath), (bPath, oPath))
+          path_combos_o[new_oPath][bPath]['pCost'] = (path_combos_o[oPath][bPath]['pCost'][0]+len(oPath), (bPath, oPath))
+        if new_oPath.path[-1] == (0, 3) and len(bPath) > 1: # Found a solution!
+          path_combos_o[new_oPath][bPath]['cost'] = (0, None)
+          exits_o.append((bPath, new_oPath))
 
 stageEnd = time()
 print 'Stage 1 done in', format_time(stageEnd-stageStart)
