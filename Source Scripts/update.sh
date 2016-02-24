@@ -1,3 +1,4 @@
+cd ~/Github/Random/Source\ Scripts
 cp ~/Library/Application\ Support/Steam/steamapps/common/Team\ Fortress\ 2/tf/cfg/autoexec.cfg tf/autoexec.cfg
 cp ~/Library/Application\ Support/Steam/steamapps/common/Team\ Fortress\ 2/tf/cfg/classreset.cfg tf/classreset.cfg
 cp ~/Library/Application\ Support/Steam/steamapps/common/Team\ Fortress\ 2/tf/cfg/scout.cfg tf/scout.cfg
