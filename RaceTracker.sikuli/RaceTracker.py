@@ -1,4 +1,7 @@
 # Suggestion: When potential difference between runners is > 20% of the time (i.e. frame 0 at time 5, difference = 2), restart calc.
+# Suggestion: Allow a stream to be a video file, provides two features:
+#    - Use as splits program (compare live vs pb)
+#	- Use as PB comparison -> Needs to be able to export both feeds with times overlayed.
 #
 # Initially, I need to determine who is in the lead:
 #	- Get current screenshot from all racers
