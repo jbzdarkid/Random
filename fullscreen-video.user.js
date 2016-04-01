@@ -9,7 +9,7 @@
 
 function redirect(url) {
 	console.log('Full-browser video redirecting to '+url);
-	window.location.replace('\n<meta http-equiv="refresh" content="0; url='+url+'">');
+	window.location.replace(url);
 }
 
 var path = window.location.pathname.split('/');
