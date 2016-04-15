@@ -2,9 +2,10 @@
 // @name Full-browser Video
 // @description Loads videos from Twitch and Youtube in 'full-browser', i.e. filling to the edge of the browser, but not fullscreen.
 // @match http://www.twitch.tv/*
+// @match https://www.twitch.tv/*
 // @match http://www.youtube.com/*
 // @match https://www.youtube.com/*
-// @version 2.2
+// @version 2.3
 // ==/UserScript==
 
 function redirect(url) {
@@ -21,19 +22,22 @@ var query = window.location.search;
 
 if (host == 'twitch') {
 	if (path.length == 2) { // Viewing a channel
-		redirect('http://player.twitch.tv/?branding=false&showInfo=false&channel='+path[1]);
+		redirect('https://player.twitch.tv/?volume=1&branding=false&showInfo=false&channel='+path[1]);
 	} else if (path.length == 4 && path[2] == 'v') { // Viewing a twitch vod
-		redirect('http://player.twitch.tv/?branding=false&showInfo=false&video='+path[2]+path[3]);
+		redirect('https://player.twitch.tv/?volume=1&branding=false&showInfo=false&video='+path[2]+path[3]);
 	}
 } else if (host == 'youtube') {
 	if (path[1] == 'watch') { // Watching a youtube video
 		var parts = query.slice(1).split('&');
+		var newParts = [];
+		var videoId = null;
 		for (var p=0; p<parts.length; p++) {
 			if (parts[p].substring(0, 2) == 'v=') {
-				var videoId = parts.splice(p, 1);
-				var videoId = parts.splice(p, 1).join('').substring(2);
-				redirect('http://www.youtube.com/embed/'+videoId+'?'+parts.join('&'));
+				videoId = parts[p].substring(2);
+			} else {
+				newParts.push(parts[p]);
 			}
 		}
+		redirect('http://www.youtube.com/embed/'+videoId+'?'+newParts.join('&'));
 	}
 }
