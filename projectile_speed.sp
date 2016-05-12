@@ -1,11 +1,17 @@
 #include <sdktools>
 #include <sdkhooks>
+<<<<<<< Updated upstream
+=======
+#include <profiler>
+#define POLL_FREQ 1.0
+>>>>>>> Stashed changes
 
 public Plugin:myinfo =
 {
   name = "Entity speed tracker",
   author = "darkid",
   description = "Calculates the speed of a moving entity. Primarily used for http://wiki.tf/Projectiles",
+<<<<<<< Updated upstream
   version = "1.3",
 }
 
@@ -76,4 +82,63 @@ public Action:GetSpeed(Handle:timer, any:entity) {
     PrintToChat(client, "%d: %f hu/s", entity, SquareRoot(norm) / 0.3);
   }
   return Plugin_Continue;
+=======
+  version = "0.0.2",
+}
+
+new Float:spawnPoint[2048][];
+new Handle:profilers[2048];
+
+public OnPluginStart() {
+  profiler = CreateProfiler();
+  StartProfiling(profiler);
+  // XYZ position for a given entity.
+  spawnPoint = new Float[2048][3];
+  profilers = new Handle[2048];
+}
+
+public OnEntityCreated(entity, const String:classname[]) {
+  SDKHook(entity, SDKHook_SpawnPost, ProjectileSpawned);
+  profilers[entity] = CreateProfiler();
+}
+public ProjectileSpawned(entity) {
+  GetEntPropVector(entity, Prop_Send, "m_vecOrigin", spawnPoint[entity]);
+  StartProfiling(profilers[entity]);
+}
+public OnEntityDestroyed(entity) {
+  if (entity < MaxClients || IsValidEntity(entity)) return;
+  new Float:position[3];
+  GetEntPropVector(entity, Prop_Send, "m_vecOrigin", position);
+  StopProfiling(profilers[entity]);
+  decl String:classname[256];
+  GetEntityClassname(entity, classname, sizeof(classname));
+
+  if (StrEqual(classname, "tf_projectile_stun_ball")) {
+    GetProjectileSpeed("Sandman Ball", position, entity);
+  } else if (StrEqual(classname, "tf_projectile_stun_ball")) {
+    GetProjectileSpeed("Wrap Assassin Ball", position, entity);
+  }
+}
+
+// Projectiles are effected by gravity, so we ignore the change in Z.
+public GetProjectileSpeed(const String:name[], Float:position[], entity) {
+  new Float:norm = Pow(position[0]-spawnPoint[entity][0], 2)+Pow(position[1]-spawnPoint[entity][1], 2);
+  new Float:time = GetProfilerTime(profilers[entity])
+  for (client = 1; client < MaxClients; client++) {
+    if (!IsValidClient(client)) continue;
+    if (!IsInGame(client)) continue;
+    PrintToChat(client, "%s moved at speed %f", name, SquareRoot(norm) / time);
+  }
+}
+
+// Rockets aren't effected by gravity, so we consider the change in Z.
+public GetProjectileSpeed(const String:name[], Float:position[], entity) {
+  new Float:norm = Pow(position[0]-spawnPoint[entity][0], 2)+Pow(position[1]-spawnPoint[entity][1], 2)+Pow(position[2]-spawnPoint[entity][2], 2);
+  new Float:time = GetProfilerTime(profilers[entity])
+  for (client = 1; client < MaxClients; client++) {
+    if (!IsValidClient(client)) continue;
+    if (!IsInGame(client)) continue;
+    PrintToChat(client, "%s moved at speed %f", name, SquareRoot(norm) / time);
+  }
+>>>>>>> Stashed changes
 }
