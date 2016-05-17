@@ -58,7 +58,7 @@ public Float:GetSpeed(Float:velocity[3]) {
 }
 
 public OnGameFrame() {
-  if (deferredEntity2 != -1) {
+  if (deferredEntity2 != -1 && false) {
     new Float:enginetime = GetGameTime();
     PrintToChat(1, "Next Primary Attack: %f", GetEntPropFloat(deferredEntity2, Prop_Send, "m_flNextPrimaryAttack") - enginetime);
     PrintToChat(1, "Next Secondary Attack: %f", GetEntPropFloat(deferredEntity2, Prop_Send, "m_flNextSecondaryAttack") - enginetime);
@@ -66,10 +66,10 @@ public OnGameFrame() {
     deferredEntity2 = -1;
   }
   if (deferredEntity != -1 && IsValidEntity(deferredEntity)) {
+    decl Float:velocity[3];
     new offset = GetEntSendPropOffs(deferredEntity, "m_vInitialVelocity");
-    if (offset == -1) { // Not a projectile, since it doesn't have velocity.
-      deferredEntity = -1;
-      return;
+    if (offset == -1) { // Not a projectile, since it doesn't have velocity property
+      offset = 572; // Try using the magic number for CBaseProjectile
     }
 
     static Float:averageSpeed = 0.0;
@@ -77,16 +77,16 @@ public OnGameFrame() {
     static Float:minSpeed = 9999999.9;
     static Float:maxSpeed = 0.0;
 
-    decl Float:velocity[3];
     GetEntDataVector(deferredEntity, offset, velocity);
     new Float:speed = GetSpeed(velocity);
-    if (speed == 0.0) return;
-    PrintToChat(1, "Projectile speed: %f", speed);
-    averageSpeed += speed;
-    numTrials++;
-    if (speed < minSpeed) minSpeed = speed;
-    if (speed > maxSpeed) maxSpeed = speed;
-    PrintToChat(1, "N: %d AVG: %f MIN: %f MAX: %f", numTrials, averageSpeed/numTrials, minSpeed, maxSpeed);
+    if (speed > 0.0) {
+      PrintToChat(1, "Projectile speed: %f", speed);
+      averageSpeed += speed;
+      numTrials++;
+      if (speed < minSpeed) minSpeed = speed;
+      if (speed > maxSpeed) maxSpeed = speed;
+      PrintToChat(1, "N: %d AVG: %f MIN: %f MAX: %f", numTrials, averageSpeed/numTrials, minSpeed, maxSpeed);
+    }
     deferredEntity = -1;
   }
 }
