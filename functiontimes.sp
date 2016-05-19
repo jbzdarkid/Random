@@ -58,7 +58,7 @@ public Float:GetSpeed(Float:velocity[3]) {
 }
 
 public OnGameFrame() {
-  if (deferredEntity2 != -1 && false) {
+  if (deferredEntity2 != -1) {
     new Float:enginetime = GetGameTime();
     PrintToChat(1, "Next Primary Attack: %f", GetEntPropFloat(deferredEntity2, Prop_Send, "m_flNextPrimaryAttack") - enginetime);
     PrintToChat(1, "Next Secondary Attack: %f", GetEntPropFloat(deferredEntity2, Prop_Send, "m_flNextSecondaryAttack") - enginetime);
