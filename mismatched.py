@@ -2,6 +2,7 @@
 from wikitools.api import APIRequest
 from wikitools.wiki import Wiki
 from wikitools.page import Page
+from urllib2 import quote
 pairs = [
   ['"', '"'],
   ['(', ')'],
@@ -52,12 +53,16 @@ for title in titles:
   page = Page(wiki, title)
   page.getWikiText()
   text = page.getWikiText()
+  printed_link = False
   for pair in pairs:
     if text.count(pair[0]) != text.count(pair[1]):
+      if not printed_link:
+        print '='*80
+        print 'https://wiki.teamfortress.com/w/index.php?action=edit&title=%s' % quote(title.encode('utf-8'))
+        printed_link = True
       indices = find_mismatch(text, pair)
+      print '-'*80
+      print pair
       for index in indices:
         print '-'*80
-        print pair, title
-        print '-'*80
         print text[index-100:index+100]
-        print '='*80
