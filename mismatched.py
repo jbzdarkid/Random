@@ -10,6 +10,7 @@ pairs = [
   ['{', '}'],
   ['<!--', '-->'],
   ['<', '>'],
+  ['<gallery', '</gallery>'],
   ['<includeonly>', '</includeonly>'],
   ['<noinclude>', '</noinclude>'],
   ['<onlyinclude>', '</onlyinclude>'],
@@ -52,7 +53,7 @@ print 'Found', len(titles), 'pages'
 for title in titles:
   page = Page(wiki, title)
   page.getWikiText()
-  text = page.getWikiText()
+  text = page.getWikiText().lower()
   printed_link = False
   for pair in pairs:
     if text.count(pair[0]) != text.count(pair[1]):
