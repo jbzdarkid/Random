@@ -36,7 +36,7 @@ if __name__ == "__main__":
 	data = urlopen('https://harrycallaghan.bandcamp.com/album/tier-3-soundtrack').read()
 	m = search('<link rel="image_src" href="(.*?)">', data)
 	urlretrieve(m.group(1), 'Cover.jpg')
-	m = search('trackinfo :(.*),', data)
+	m = search('trackinfo ?:(.*),', data)
 	dict = loads(m.group(1))
 	numTracks = len(dict)
 	global gui
