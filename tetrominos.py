@@ -462,25 +462,30 @@ def solve(challenges, NUMTHREADS, _MAXSOLNS, benchmark=False):
 if __name__ == "__main__":
   challenges = {
     # 'Name': ['Pieces', Height, Width],
-    'Connector':  ['T0, T0, L1', 3, 4], # 1
-    'Cube':       ['T0, T0, L1, Z0', 4, 4], # 1
-    'Fan':        ['T0, T0, L1, S0, Z0', 5, 4], # 1
-    'Recorder':   ['T0, T0, J1, S0, Z0', 5, 4], # 0
-    'Platform':   ['I1, O0, T0, T0, L1, Z0', 6, 4], # 3.1
-    'A':          ['I1, L1, J1, Z0', 4, 4], # 0
-    'B':          ['I1, T0, T0, L1, Z0', 5, 4], # 1
-    'C':          ['T0, T0, J1, J1, L1, Z0', 6, 4], # 0
-    'A star':     ['T0, T0, T0, T0, L1, J1, S0, S0, Z0, Z0', 5, 8], # 1
-    'B star':     ['I1, I1, O0, T0, T0, T0, T0, L1, L1, J1', 5, 8], # 1
-    'C star':     ['L1, J1, S0, Z0, T0, T0, I1, I1, O0, O0', 5, 8], # 1
-    'Floor 1':    ['L1, Z0, L1, Z0', 4, 4], # 1
-    'Floor 2':    ['O0, T0, T0, T0, T0, L1, L1, L1, L1', 6, 6], # 2
-    'Floor 3':    ['I1, I1, I1, I1, J1, J1, L1, L1, S0, Z0', 5, 8], # 0
-    'Floor 4':    ['O0, O0, T0, T0, T0, T0, J1, L1, S0, S0, Z0, Z0', 8, 6], # 1
-    'Floor 5':    ['I1, I1, O0, O0, O0, O0, T0, T0, T0, T0, J1, L1, S0, Z0', 7, 8], # 0
-    'Floor 6':    ['O0, S0, S0, S0, S0, L0, L0, L0, L0', 6, 6], # 3.1
-    'DLC Silver': ['I1, T0, T0, L1, L1, J1, J1', 4, 7], # 1
-    'DLC Gold':   ['T0, S0, S0, T0, T0, I1, S0, I1, T0, L1', 8, 5], # 3.1
+    'Connector':      ['T0, T0, L1', 3, 4], # 1
+    'Cube':           ['T0, T0, L1, Z0', 4, 4], # 1
+    'Fan':            ['T0, T0, L1, S0, Z0', 5, 4], # 1
+    'Recorder':       ['T0, T0, J1, S0, Z0', 5, 4], # 0
+    'Platform':       ['I1, O0, T0, T0, L1, Z0', 6, 4], # 3.1
+    'A':              ['I1, L1, J1, Z0', 4, 4], # 0
+    'B':              ['I1, T0, T0, L1, Z0', 5, 4], # 1
+    'C':              ['T0, T0, J1, J1, L1, Z0', 6, 4], # 0
+    'A star':         ['T0, T0, T0, T0, L1, J1, S0, S0, Z0, Z0', 5, 8], # 1
+    'B star':         ['I1, I1, O0, T0, T0, T0, T0, L1, L1, J1', 5, 8], # 1
+    'C star':         ['L1, J1, S0, Z0, T0, T0, I1, I1, O0, O0', 5, 8], # 1
+    'Floor 1':        ['L1, Z0, L1, Z0', 4, 4], # 1
+    'Floor 2':        ['O0, T0, T0, T0, T0, L1, L1, L1, L1', 6, 6], # 2
+    'Floor 3':        ['I1, I1, I1, I1, J1, J1, L1, L1, S0, Z0', 5, 8], # 0
+    'Floor 4':        ['O0, O0, T0, T0, T0, T0, J1, L1, S0, S0, Z0, Z0', 8, 6], # 1
+    'Floor 5':        ['I1, I1, O0, O0, O0, O0, T0, T0, T0, T0, J1, L1, S0, Z0', 7, 8], # 0
+    'Floor 6':        ['O0, S0, S0, S0, S0, L0, L0, L0, L0', 6, 6], # 3.1
+    'DLC Silver':     ['I1, T0, T0, L1, L1, J1, J1', 4, 7], # 1
+    'DLC Gold':       ['T0, S0, S0, T0, T0, I1, S0, I1, T0, L1', 8, 5], # 3.1
+    'CM L Connector': ['T0, T0, L1, S0, Z0', 5, 4],
+    'CM R Connector': ['L1, L1, J1, T0, T0', 5, 4],
+    'CM B Source':    ['L1, J1, Z0, Z0, T0, T0, I1', 4, 7],
+    'CM R Source':    ['T0, T0, I1, L1, L1, J1, J1, J1, O0, O0, Z0, Z0', 6, 8],
+    'CM Messenger':   ['I1, O0, O0, Z0, Z0, L1, L1, J1, J1', 6, 6]
   }
   solve(challenges, 16, 0)
   if DEBUG:
