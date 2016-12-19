@@ -412,13 +412,13 @@ def solve(challenges, NUMTHREADS, _MAXSOLNS, benchmark=False):
     data = challenges[title]
     maxCost = -1
     solutions = []
-    pieces = data[0].split(' ')
+    pieces = list(data[0])
 
     TCount = 0
     for i in range(len(pieces)):
-      if pieces[i][0] == 'T':
+      if pieces[i] == 'T':
         TCount += 1
-      pieces[i] = (pieces[i][0], int(pieces[i][1]))
+      pieces[i] = (pieces[i], 0)
 
     print 'Challenge "{name}" using {num} pieces: {pieces}'.format(name=title, num = len(pieces), pieces=', '.join([a+str(b) for a,b in pieces]))
     startTime = time()
@@ -462,27 +462,42 @@ def solve(challenges, NUMTHREADS, _MAXSOLNS, benchmark=False):
 if __name__ == "__main__":
   challenges = {
     # 'Name': ['Pieces', Height, Width],
-    # 'Connector':  ['T0 T0 L0, 3, 4], # 1
-    # 'Hexahedron': ['T0 T0 L0 Z0', 4, 4], # 1
-    # 'Fan':        ['T0 T0 L0 S0 Z0', 5, 4], # 1
-    # 'Recorder':   ['T0 T0 J0 S0 Z0', 5, 4], # 0
-    # 'Platform':   ['I0 O0 T0 T0 L0 Z0', 6, 4], # 3.1
-    # 'A':          ['I0 L0 J0 Z0', 4, 4], # 0
-    # 'B':          ['I0 T0 T0 L0 Z0', 5, 4], # 1
-    # 'C':          ['T0 T0 J0 J0 L0 Z0', 6, 4], # 0
-    # 'A star':     ['T0 T0 T0 T0 L0 J0 S0 S0 Z0 Z0', 5, 8], # 1
-    # 'B star':     ['I0 I0 O0 T0 T0 T0 T0 L0 L0 J0', 5, 8], # 1
-    # 'C star':     ['L0 J0 S0 Z0 T0 T0 I0 I0 O0 O0', 5, 8], # 1
-    # 'Floor 1':    ['L0 Z0 L0 Z0', 4, 4], # 1
-    # 'Floor 2':    ['O0 T0 T0 T0 T0 L0 L0 L0 L0', 6, 6], # 2
-    # 'Floor 3':    ['I0 I0 I0 I0 J0 J0 L0 L0 S0 Z0', 5, 8], # 0
-    # 'Floor 4':    ['O0 O0 T0 T0 T0 T0 J0 L0 S0 S0 Z0 Z0', 8, 6], # 1
-    # 'Floor 5':    ['I0 I0 O0 O0 O0 O0 T0 T0 T0 T0 J0 L0 S0 Z0', 7, 8], # 0
-    # 'Floor 6':    ['O0 S0 S0 S0 S0 L0 L0 L0 L0', 6, 6], # 3.1
+    # 'Connector':  ['TTL',            3, 4], # 1
+    # 'Hexahedron': ['TTLZ',           4, 4], # 1
+    # 'Fan':        ['TTLSZ',          5, 4], # 1
+    # 'Recorder':   ['TTJSZ',          5, 4], # 0
+    # 'Platform':   ['IOTTLZ',         6, 4], # 3.1
+    # 'A':          ['ILJZ',           4, 4], # 0
+    # 'B':          ['ITTLZ',          5, 4], # 1
+    # 'C':          ['TTJJLZ',         6, 4], # 0
+    # 'A star':     ['TTTTLJSSZZ',     5, 8], # 1
+    # 'B star':     ['IIOTTTTLLJ',     5, 8], # 1
+    # 'C star':     ['LJSZTTIIOO',     5, 8], # 1
+    # 'Floor 1':    ['LZLZ',           4, 4], # 1
+    # 'Floor 2':    ['OTTTTLLLL',      6, 6], # 2
+    # 'Floor 3':    ['IIIIJJLLSZ',     5, 8], # 0
+    # 'Floor 4':    ['OOTTTTJLSSZZ',   8, 6], # 1
+    # 'Floor 5':    ['IIOOOOTTTTJLSZ', 7, 8], # 0
+    # 'Floor 6':    ['OSSSSLLLL',      6, 6], # 3.1
 
+    'Messenger A Connector':   ['STTTTOOILL',  10, 4], # 2
+    'Messenger A Red Source':  ['ZZSTTIILLO',   8, 5], # 0
+    'Messenger A Hexahedron':  ['OOTTLLJIS',    6, 6], # 0
+    'Messenger A Fan':         ['ZZZLLJJTT',    6, 6], # 1
+    'Messenger A Final':       ['IOOJJ',        5, 4], # 0
+    'Messenger B Blue Source': ['TTOOILLJJJSS', 6, 8], # 0
+    'Messenger B Red Source':  ['TTZLI',        5, 4], # 1
+    'Messenger B Connector 1': ['TTTTZZSIIJ',  10, 4], # 1
+    'Messenger B Connector 2': ['IITTZSL',      4, 7], # 1
+    'Messenger B Final':       ['ITTOOSZZZJJJ', 6, 8], # 0
+    'Messenger C Red Source':  ['TTILLJJJOOZZ', 6, 8], # 0
+    'Messenger C Blue Source': ['LJZZTTI',      4, 7], # 1
+    'Messenger C Connector 1': ['LLJTT',        5, 4], # 1
+    'Messenger C Connector 2': ['JZSTT',        5, 4], # 0
+    'Messenger C Final':       ['IOOZZLLJJ',    6, 6], # 0
 
-    # 'Gehenna Silver': ['I0, T0, T0, L0, L0, J0, J0', 4, 7], # 1
-    # 'Gehenna Gold':   ['T0, S0, S0, T0, T0, I0, S0, I0, T0, L0', 8, 5], # 3.1
+    # 'Road to Gehenna Silver': ['ITTLLJJ',    4, 7], # 1
+    # 'Road to Gehenna Gold':   ['TSSTTISITL', 8, 5], # 3.1
   }
   solve(challenges, 16, 0)
   if DEBUG:
