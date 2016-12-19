@@ -497,6 +497,9 @@ if __name__ == "__main__":
     'Messenger C Connector 2': ['JSTTZ',        5, 4], # 0
     'Messenger C Final':       ['IJJLLOOZZ',    6, 6], # 0
 
+    # 'Demo Green': ['IILSTTZ', 4, 7],
+    # 'Demo Blue':  ['LSTTZ',   5, 4],
+    # 'Demo Gold':  ['ILOTTZ',  6, 4],
 
     # 'Road to Gehenna Silver': ['IJJLLTT',    4, 7], # 1
     # 'Road to Gehenna Gold':   ['IILSSSTTTT', 8, 5], # 3.1
