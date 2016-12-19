@@ -444,6 +444,7 @@ def solve(challenges, NUMTHREADS, _MAXSOLNS, benchmark=False):
       continue
     timeData[0][0] += 1
     timeData[0][1] += runtime
+    solutions.sort(key=lambda s: s.steps)
     for solution in solutions:
       solution.printBoard()
   try:
@@ -500,6 +501,6 @@ if __name__ == "__main__":
     # 'Road to Gehenna Silver': ['IJJLLTT',    4, 7], # 1
     # 'Road to Gehenna Gold':   ['IILSSSTTTT', 8, 5], # 3.1
   }
-  solve(challenges, 16, 0)
+  solve(challenges, 16, -1)
   if DEBUG:
     print checks
