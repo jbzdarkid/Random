@@ -112,7 +112,9 @@ def doubleIter(xmax, ymax, start=(0, 0)):
     for y in range(0, ymax):
       yield (x, y)
 
+from Queue import Empty, PriorityQueue
 from threading import Lock, Thread
+from time import time
 global uuidlock
 uuidlock = Lock()
 def getUUID():
@@ -240,7 +242,6 @@ class PartialSolution(Thread):
   # Done with helper functions, real code starts here
   def run(self):
     while True:
-      from Queue import Empty
       global q, pieces
       try:
         _cost, self = q.get(True, 1)
@@ -400,8 +401,6 @@ def randomChallenge(x, y):
 def solve(challenges, NUMTHREADS, _MAXSOLNS, benchmark=False):
   global MAXSOLNS
   MAXSOLNS = _MAXSOLNS
-  from Queue import PriorityQueue
-  from time import time
   timeData = [[0, 0.0], [0, 0.0]]
   if DEBUG:
     NUMTHREADS = 1
