@@ -314,7 +314,9 @@ class PartialSolution(Thread):
             for i in range(self.x, self.x+len(piece)):
               for j in range(self.board_w):
                 if not newSolution.getBoard(i, j): # A potential gap
-                  if newSolution.isInvalid(i, j-1) and newSolution.isInvalid(i, j+1) and newSolution.isInvalid(i+1, j):
+                  if (newSolution.isInvalid(i, j-1) and
+                      newSolution.isInvalid(i, j+1) and
+                      newSolution.isInvalid(i+1, j)):
                     if DEBUG:
                       print 'Failed check #2'
                       checks[1] += 1
@@ -323,10 +325,10 @@ class PartialSolution(Thread):
                       raise StopIteration
 
             # Third check: Uneven parity in the last row(s). (7% hitrate)
-            # If the piece touches the edge of the board,
-            # then it divides the remaining space into two parts.
-            # Each part must be a multiple of 4, or else it can't be filled by tetrominos.
-            if len(piece) + self.x == self.board_h: # Piece placed touches the end of the board
+            # If the piece touches the edge of the board, then it divides the
+            # remaining space into two parts. Each part must be a multiple of 4,
+            # or else it can't be filled by tetrominos.
+            if len(piece) + self.x == self.board_h: # Touches the edge
               # Looking through columns until we find a filled one
               spaces = 0
               for j in range(self.board_w):
@@ -345,8 +347,8 @@ class PartialSolution(Thread):
                       raise StopIteration
 
             # Fourth check: T-tetromino parity. (0.55% hitrate)
-            # Consider the board to be a checkerboard,
-            # then a T piece covers 3 black and 1 white squares, whereas all other pieces
+            # Consider the board to be a checkerboard, then a T piece
+            # covers 3 black and 1 white squares, whereas all other pieces
             # cover 2 and 2. Thus, you must have an even number of T pieces AND
             # exactly half must be placed on white and half on black.
             if pieceName == 'T':
@@ -378,18 +380,6 @@ class PartialSolution(Thread):
           except StopIteration:
             pass
       q.task_done()
-
-def randomChallenge(x, y):
-  from random import randint
-  numPieces = x*y/4
-  pieces = 'I0, I0, I1, I1, J0, J1, J2, J3, L0, L1, L2, L3, O0, O0, O0, O0, S0, S0, S1, S1, T0, T1, T2, T3, Z0, Z0, Z1, Z1'.split(', ')
-  pieceList = ''
-  for i in range(numPieces):
-    r = randint(0, len(pieces)-1)
-    pieceList += pieces[r] + ', '
-  if pieceList.count('T') % 2 != 0:
-    return randomChallenge(x, y)
-  return [pieceList[:-2], x, y]
 
 # MAXSOLNS can also be set to 'All', maxint, or a value
 def solve(challenges, NUMTHREADS=4, _MAXSOLNS=maxint, benchmark=False):
@@ -479,25 +469,28 @@ if __name__ == "__main__":
     # 'Floor 5':    ['IIJLOOOOSTTTTZ', 7, 8], # 0
     # 'Floor 6':    ['OLLLLSSSS',      6, 6], # 3.1
 
-    'Messenger A Connector':   ['ILLOOSTTTT',  10, 4], # 2
-    'Messenger A Red Source':  ['IILLOSTTZZ',   8, 5], # 0
-    'Messenger A Hexahedron':  ['IJLLOOSTT',    6, 6], # 0
-    'Messenger A Fan':         ['JJLLTTZZZ',    6, 6], # 1
-    'Messenger A Final':       ['IJJOO',        5, 4], # 0
-    'Messenger B Blue Source': ['IJJJLLOOSSTT', 6, 8], # 0
-    'Messenger B Red Source':  ['ILTTZ',        5, 4], # 1
-    'Messenger B Connector 1': ['IIJSTTTTZZ',  10, 4], # 1
-    'Messenger B Connector 2': ['IILSTTZ',      4, 7], # 1
-    'Messenger B Final':       ['IJJJOOSTTZZZ', 6, 8], # 0
+    # 'Messenger A Connector':   ['ILLOOSTTTT',  10, 4], # 2
+    # 'Messenger A Red Source':  ['IILLOSTTZZ',   8, 5], # 0
+    # 'Messenger A Hexahedron':  ['IJLLOOSTT',    6, 6], # 0
+    # 'Messenger A Fan':         ['JJLLTTZZZ',    6, 6], # 1
+    # 'Messenger A Final':       ['IJJOO',        5, 4], # 0
+    # 'Messenger B Blue Source': ['IJJJLLOOSSTT', 6, 8], # 0
+    # 'Messenger B Red Source':  ['ILTTZ',        5, 4], # 1
+    # 'Messenger B Connector 1': ['IIJSTTTTZZ',  10, 4], # 1
+    # 'Messenger B Connector 2': ['IILSTTZ',      4, 7], # 1
+    # 'Messenger B Final':       ['IJJJOOSTTZZZ', 6, 8], # 0
     'Messenger C Red Source':  ['IJJJLLOOTTZZ', 6, 8], # 0
-    'Messenger C Blue Source': ['IJLTTZZ',      4, 7], # 1
-    'Messenger C Connector 1': ['JLLTT',        5, 4], # 1
-    'Messenger C Connector 2': ['JSTTZ',        5, 4], # 0
-    'Messenger C Final':       ['IJJLLOOZZ',    6, 6], # 0
+    # 'Messenger C Blue Source': ['IJLTTZZ',      4, 7], # 1
+    # 'Messenger C Connector 1': ['JLLTT',        5, 4], # 1
+    # 'Messenger C Connector 2': ['JSTTZ',        5, 4], # 0
+    # 'Messenger C Final':       ['IJJLLOOZZ',    6, 6], # 0
 
     # 'Demo Green': ['IILSTTZ', 4, 7],
     # 'Demo Blue':  ['LSTTZ',   5, 4],
     # 'Demo Gold':  ['ILOTTZ',  6, 4],
+
+    # 'Data Backup Green': ['IJLOSZ', 6, 4],
+    # 'Data Backup Gold':  ['IJJLLZ', 6, 4],
 
     # 'Road to Gehenna Silver': ['IJJLLTT',    4, 7], # 1
     # 'Road to Gehenna Gold':   ['IILSSSTTTT', 8, 5], # 3.1
