@@ -202,9 +202,9 @@ class PartialSolution(Thread):
     # Board3 is constructed from board 2. It's just prettier :)
     board3 = [['/' for _ in range(self.board_w*10+1)] for __ in range(self.board_h*5+1)]
     # Fixing some corners
-    board3[0][self.board_w*10] = '-'
-    board3[self.board_h*5][0] = '|'
-    board3[self.board_h*5][self.board_w*10] = '+'
+    board3[0][-1] = '-'
+    board3[-1][0] = '|'
+    board3[-1][-1] = '+'
     for x, y in doubleIter(len(board2), len(board2[x])):
       if board2[x][y] != -1: # Piece internal
         for i, j in doubleIter(4, 9):
@@ -255,7 +255,7 @@ class PartialSolution(Thread):
       global maxCost
       if self.cost > maxCost and maxCost != -1:
         if DEBUG:
-          print 'cost', self.cost,' > maxCost', maxCost
+          print 'cost > maxCost: %d > %d' % (self.cost, maxCost)
         continue
       # Completed solution, since all pieces are placed
       if len(self.pieces) == len(self.steps):
@@ -367,19 +367,15 @@ class PartialSolution(Thread):
 
             # Passed all checks
             if DEBUG:
-              print 'Success, added', newSolution.uuid, 'to queue.'
+              print 'Success, added %d to the queue.' % newSolution.uuid
             newSolution.pieces[pieceNum] = None
             newSolution.steps.append((pieceNum, rotation))
 
-            if rotation == 0:
-              cost = 0
-            elif rotation == 1:
-              cost = 0 # First rotation is free because you can right-click the piece
-            elif rotation == 2:
-              cost = 1
-            elif rotation == 3:
-              cost = 2.1 # Rotating 3 times once is more expensive than 2 times twice.
             if self.cost + cost <= maxCost or maxCost == -1:
+            # 0 and 1 rotation are free because you can left or right click
+            # 2 rotations has a small cost, but can be done during placement
+            # 3 rotations takes slightly longer, since it requires a delay
+            cost = [0, 0, 1, 2.1][rotation]
               q.put((self.cost + cost, newSolution))
           except StopIteration:
             pass
@@ -434,8 +430,13 @@ def solve(challenges, NUMTHREADS, _MAXSOLNS, benchmark=False):
     for thread in threads:
       thread.join()
     runtime = time()-startTime
-    print 'Took {time} seconds using {partials} partials.'.format(time=runtime, partials = uuid)
-    print 'Found {num} solution{s} with {cost} rotations.'.format(num=len(solutions), s=('s' if len(solutions) != 1 else ''), cost=maxCost)
+    print 'Took %d seconds using %d partials.' % (runtime, uuid)
+    if len(solutions) == 1:
+      print 'Found 1 solution'
+    elif len(solutions) > 1:
+      print 'Found %d solutions' % len(solutions)
+    if maxCost != maxint:
+      print 'Minimal solution cost: %d' % maxCost
     print
     if len(solutions) == 0:
       timeData[1][0] += 1
