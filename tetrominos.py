@@ -113,6 +113,7 @@ def doubleIter(xmax, ymax, start=(0, 0)):
       yield (x, y)
 
 from Queue import Empty, PriorityQueue
+from sys import maxint
 from threading import Lock, Thread
 from time import time
 global uuidlock
@@ -253,7 +254,7 @@ class PartialSolution(Thread):
       if DEBUG:
         self.debug()
       global maxCost
-      if self.cost > maxCost and maxCost != -1:
+      if self.cost > maxCost:
         if DEBUG:
           print 'cost > maxCost: %d > %d' % (self.cost, maxCost)
         continue
@@ -261,15 +262,12 @@ class PartialSolution(Thread):
       if len(self.pieces) == len(self.steps):
         if DEBUG:
           print '(complete solution)'
-        global solutions
-        if len(solutions) == 0:
-          maxCost = self.cost
-        global MAXSOLNS
-        if len(solutions) == MAXSOLNS:
+        global solutions, MAXSOLNS
+        if MAXSOLNS != 'All': # Don't update max cost
+          maxCost = min(maxCost, self.cost)
+        if MAXSOLNS == len(solutions):
           return
         solutions.append(self)
-        if len(solutions) == MAXSOLNS: # Allows the -1/0 maxSolutions logicbelow.
-          return
         q.task_done()
         continue
 
@@ -371,11 +369,11 @@ class PartialSolution(Thread):
             newSolution.pieces[pieceNum] = None
             newSolution.steps.append((pieceNum, rotation))
 
-            if self.cost + cost <= maxCost or maxCost == -1:
             # 0 and 1 rotation are free because you can left or right click
             # 2 rotations has a small cost, but can be done during placement
             # 3 rotations takes slightly longer, since it requires a delay
             cost = [0, 0, 1, 2.1][rotation]
+            if self.cost + cost <= maxCost:
               q.put((self.cost + cost, newSolution))
           except StopIteration:
             pass
@@ -393,8 +391,8 @@ def randomChallenge(x, y):
     return randomChallenge(x, y)
   return [pieceList[:-2], x, y]
 
-# Set MAXSOLNS -1 for all solutions. Set to 0 to calculate only cost.
-def solve(challenges, NUMTHREADS, _MAXSOLNS, benchmark=False):
+# MAXSOLNS can also be set to 'All', maxint, or a value
+def solve(challenges, NUMTHREADS=4, _MAXSOLNS=maxint, benchmark=False):
   global MAXSOLNS
   MAXSOLNS = _MAXSOLNS
   timeData = [[0, 0.0], [0, 0.0]]
@@ -405,7 +403,7 @@ def solve(challenges, NUMTHREADS, _MAXSOLNS, benchmark=False):
   uuid = 0
   for title in sorted(challenges.keys()):
     data = challenges[title]
-    maxCost = -1
+    maxCost = maxint
     solutions = []
     pieces = list(data[0])
 
@@ -504,6 +502,6 @@ if __name__ == "__main__":
     # 'Road to Gehenna Silver': ['IJJLLTT',    4, 7], # 1
     # 'Road to Gehenna Gold':   ['IILSSSTTTT', 8, 5], # 3.1
   }
-  solve(challenges, 16, -1)
+  solve(challenges, 16, 0)
   if DEBUG:
     print checks
