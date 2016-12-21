@@ -383,10 +383,9 @@ class PartialSolution(Thread):
       q.task_done()
 
 # MAXSOLNS can also be set to 'All', maxint, or a value
-def solve(challenges, NUMTHREADS=4, _MAXSOLNS=maxint, benchmark=False):
+def solve(challenges, NUMTHREADS=4, _MAXSOLNS=maxint, quiet=False):
   global MAXSOLNS
   MAXSOLNS = _MAXSOLNS
-  timeData = [[0, 0.0], [0, 0.0]]
   if DEBUG:
     NUMTHREADS = 1
 
@@ -404,7 +403,8 @@ def solve(challenges, NUMTHREADS=4, _MAXSOLNS=maxint, benchmark=False):
         TCount += 1
       pieces[i] = (pieces[i], 0)
 
-    print 'Challenge "{name}" using {num} pieces: {pieces}'.format(name=title, num = len(pieces), pieces=', '.join([a+str(b) for a,b in pieces]))
+    if not quiet:
+      print 'Challenge "{name}" using {num} pieces: {pieces}'.format(name=title, num = len(pieces), pieces=', '.join([a+str(b) for a,b in pieces]))
     startTime = time()
 
     global q
@@ -419,35 +419,16 @@ def solve(challenges, NUMTHREADS=4, _MAXSOLNS=maxint, benchmark=False):
     for thread in threads:
       thread.join()
     runtime = time()-startTime
-    print 'Took %d seconds using %d partials.' % (runtime, uuid)
-    if len(solutions) == 1:
-      print 'Found 1 solution'
-    elif len(solutions) > 1:
-      print 'Found %d solutions' % len(solutions)
-    if maxCost != maxint:
-      print 'Minimal solution cost: %d' % maxCost
-    print
-    if len(solutions) == 0:
-      timeData[1][0] += 1
-      timeData[1][1] += runtime
-      continue
-    timeData[0][0] += 1
-    timeData[0][1] += runtime
-    solutions.sort(key=lambda s: s.steps)
-    for solution in solutions:
-      solution.printBoard()
-  try:
-    print 'Average time for success:', timeData[0][1]/timeData[0][0]
-  except ZeroDivisionError:
-    print 'N/A'
-  try:
-    print 'Average time for failure:', timeData[1][1]/timeData[1][0]
-  except ZeroDivisionError:
-    print 'N/A'
-  try:
-    print 'Average overall:', (timeData[0][1]+timeData[1][1])/(timeData[0][0]+timeData[1][0])
-  except ZeroDivisionError:
-    print 'N/A'
+    if not quiet:
+      print 'Took %d seconds using %d partials.' % (runtime, uuid)
+      if maxCost != maxint:
+        print 'Minimal solution cost: %d' % maxCost
+      if len(solutions) > 0:
+        print 'Found %d solutions:' % len(solutions)
+      solutions.sort(key=lambda s: s.steps)
+      for solution in solutions:
+        solution.printBoard()
+  return solutions
 
 if __name__ == "__main__":
   challenges = {
