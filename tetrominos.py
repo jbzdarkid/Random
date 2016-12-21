@@ -480,21 +480,28 @@ if __name__ == "__main__":
     # 'Messenger B Connector 1': ['IIJSTTTTZZ',  10, 4], # 1
     # 'Messenger B Connector 2': ['IILSTTZ',      4, 7], # 1
     # 'Messenger B Final':       ['IJJJOOSTTZZZ', 6, 8], # 0
-    'Messenger C Red Source':  ['IJJJLLOOTTZZ', 6, 8], # 0
+    # 'Messenger C Red Source':  ['IJJJLLOOTTZZ', 6, 8], # 0
     # 'Messenger C Blue Source': ['IJLTTZZ',      4, 7], # 1
     # 'Messenger C Connector 1': ['JLLTT',        5, 4], # 1
     # 'Messenger C Connector 2': ['JSTTZ',        5, 4], # 0
     # 'Messenger C Final':       ['IJJLLOOZZ',    6, 6], # 0
 
-    # 'Demo Green': ['IILSTTZ', 4, 7],
-    # 'Demo Blue':  ['LSTTZ',   5, 4],
-    # 'Demo Gold':  ['ILOTTZ',  6, 4],
-
-    # 'Data Backup Green': ['IJLOSZ', 6, 4],
-    # 'Data Backup Gold':  ['IJJLLZ', 6, 4],
-
+    # 'Data Backup Green':      ['IJLOSZ',     6, 4],
+    # 'Data Backup Gold':       ['IJJLLZ',     6, 4],
+    # 'Demo Green':             ['IILSTTZ',    4, 7],
+    # 'Demo Blue':              ['LSTTZ',      5, 4],
+    # 'Demo Gold':              ['ILOTTZ',     6, 4],
+    # 'Rebirth Bronze':         ['IJLLLOZ',    4, 7],
+    # 'Rebirth Silver':         ['JJLSTTZ',    4, 7],
+    # 'Rebirth Gold':           ['IJOSTTZ',    4, 7],
+    # 'Rebirth Star':           ['OOOOOOOO',   4, 8], # 0
     # 'Road to Gehenna Silver': ['IJJLLTT',    4, 7], # 1
     # 'Road to Gehenna Gold':   ['IILSSSTTTT', 8, 5], # 3.1
+    # 'Fourth Dimension Door':  ['JJOTT',      5, 4],
+    # 'Fourth Dimension Cube':  ['IJLOSS',     6, 4],
+    # 'Fourth Dimension Exit':  ['LL',         4, 2],
+    # 'Fourth Dimension Star':  ['JLSZZ',      5, 4],
+    # 'This is the only Level': ['TTTTTTS',    7, 4],
   }
   solve(challenges, 16, 0)
   if DEBUG:
