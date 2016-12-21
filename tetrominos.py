@@ -316,7 +316,8 @@ class PartialSolution(Thread):
                 if not newSolution.getBoard(i, j): # A potential gap
                   if (newSolution.isInvalid(i, j-1) and
                       newSolution.isInvalid(i, j+1) and
-                      newSolution.isInvalid(i+1, j)):
+                      newSolution.isInvalid(i+1, j) and
+                      newSolution.isInvalid(i-1, j)):
                     if DEBUG:
                       print 'Failed check #2'
                       checks[1] += 1
