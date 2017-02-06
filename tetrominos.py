@@ -431,6 +431,31 @@ def solve(challenges, NUMTHREADS=4, _MAXSOLNS=maxint, quiet=False):
   return solutions
 
 if __name__ == "__main__":
+  # from itertools import combinations_with_replacement
+  # from math import factorial
+  # from multiprocessing import Pool
+  # N = 9
+  # def get_cost(puzzle):
+  #   puzzle = ''.join(puzzle)
+  #   solutions = solve({'':[puzzle, 4, N]}, 1, 'All', quiet=True)
+  #   cost = len(solutions)
+  #   for char in 'IJLOSTZ':
+  #     cost *= factorial(puzzle.count(char))
+  #   return (cost, puzzle)
+  #
+  # pool = Pool(8)
+  # solveData = pool.map(get_cost, combinations_with_replacement('IJLOSTZ', N))
+  # solveData2 = {}
+  # for cost, puzzle in solveData:
+  #   try:
+  #     solveData2[cost].append(puzzle)
+  #   except KeyError:
+  #     solveData2[cost] = [puzzle]
+  # del solveData2[0]
+  # print 'List of all %dx4 puzzles by difficulty (hardest first):' % N
+  # for cost in sorted(solveData2.keys()):
+  #   print '%d: %s' % (cost, ' '.join(solveData2[cost]))
+  # exit(0)
   challenges = {
     # 'Name': ['Pieces', Height, Width],
     # 'Connector':  ['LTT',            3, 4], # 1
@@ -442,7 +467,7 @@ if __name__ == "__main__":
     # 'B':          ['ILTTZ',          5, 4], # 1
     # 'C':          ['JJLTTZ',         6, 4], # 0
     # 'A star':     ['JLSSTTTTZZ',     5, 8], # 1
-    # 'B star':     ['IIJLLOTTTT',     5, 8], # 1
+    'B star':     ['IIJLLOTTTT',     5, 8], # 1
     # 'C star':     ['IIJLOOSTTZ',     5, 8], # 1
     # 'Floor 1':    ['LLZZ',           4, 4], # 1
     # 'Floor 2':    ['LLLLOTTTT',      6, 6], # 2
@@ -483,6 +508,11 @@ if __name__ == "__main__":
     # 'Fourth Dimension Exit':  ['LL',         4, 2],
     # 'Fourth Dimension Star':  ['JLSZZ',      5, 4],
     # 'This is the only Level': ['TTTTTTS',    7, 4],
+
+    # 'Hardest 6x4': ['IJLOSZ', 6, 4],
+    # 'Hardest 8x4': ['IJLOSSSZ', 8, 4],
+    # 'Hardest Nx6': [''],
+    # 'Hardest Nx8': [''],
   }
   solve(challenges, 16, 1)
   if DEBUG:
