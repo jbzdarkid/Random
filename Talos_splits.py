@@ -1,182 +1,200 @@
-puzzles = {
-'**1': 'A3 Star #2 (ABTU)',
-'**2': 'A2 Star (Outside)',
-'**3': 'A3 Star #1 (Outside)',
-'**4': 'A4 Star (PiF)',
-'**5': 'A1 Star (Outside)',
-'**6': 'A5 Star #2 (FC)',
-'**7': 'A5 Star #1 (TtDWTB)',
-'**8': 'A6 Star (Outside)',
-'**9': 'A7 Star (TPLB)',
-'**10': 'B1 Star (SaaS)',
-'**11': 'B2 Star (TT)',
-'**12': 'B3 Star (BA)',
-'**13': 'B4 Star #1 (TRA)',
-'**14': 'B5 Star #1 (Outside)',
-'**15': 'B7 Star #2 (Outside)',
-'**16': 'B7 Star #1 (BSbS)',
-'**17': 'C1 Star (Outside)',
-'**18': 'C2 Star (ADaaF)',
-'**19': 'C3 Star (W)',
-'**20': 'C4 Star #2 (O)',
-'**21': 'C4 Star #1 (TR)',
-'**22': 'C5 Star #3 (D)',
-'**23': 'C5 Star #2 (TF)',
-'**24': 'B4 Star #2 (Outside',
-'**25': 'Floor 3 Star',
-'**26': 'Messenger Garden Star',
-'**27': 'C5 Star #1 (UCaJ)',
-'**28': 'Floor 0 Star',
-'**29': 'C6 Star',
-'**30': 'C7 Star',
-'DI1': 'Poking a Sleeping Lion',
-'DI2': 'Things to Do With Two Boxes',
-'DJ1': 'Striding the Beaten Path',
-'DJ2': 'Outnumbered',
-'DJ3': 'Only the Two of Us',
-'DJ4': 'Self-Help Tutorial',
-'DJ5': 'Slightly Elevated Sigil',
-'DL1': 'The Guards Must Be Crazy',
-'DL2': 'You Know You Mustn\'t Cross the Streams',
-'DL3': 'Locked from Inside',
-'DT1': 'Going Over the Fence',
-'DT2': 'One Little Buzzer',
-'DT3': 'Trapped Inside',
-'DT4': 'Double Plate',
-'DZ1': 'A Switch out of Reach',
-'DZ2': 'Hall of Windows',
-'DZ3': 'Stashed for Later',
-'DZ4': 'Mobile Mindfield',
-'EL1': 'Jammed from Within',
-'EL2': 'Merry Go \'Round',
-'EL3': 'Peekaboo!',
-'EL4': 'Unreachable Garden',
-'EO1': 'Nexus',
-'ES1': 'Nerve-Wrecker',
-'ES2': 'Cat\'s Cradle',
-'ES3': 'Dumb Dumb Mine',
-'ES4': 'Cobweb',
-'L10': 'Dead Man\'s Switch',
-'MI1': 'Bouncing Side by Side',
-'MJ1': 'Blown Away',
-'ML1': 'Trio Bombasticus',
-'ML2': 'Suicide Mission',
-'ML3': 'Window through a Door',
-'ML4': 'Crisscross Conundrum',
-'MO1': 'Big Lump of Mine',
-'MS1': 'Third Wheel',
-'MS2': 'The Tomb',
-'MT1': 'Peephole',
-'MT2': 'A Bit Tied Up',
-'MT3': 'Locked Me Up, Swallowed the Key',
-'MT4': 'Branch it Out',
-'MT5': 'Above All That...',
-'MT6': 'Over the Fence',
-'MT7': 'Road of Death',
-'MT8': 'Man on The Moon',
-'MT9': 'Sunshot',
-'MZ1': 'Push it Further',
-'MZ2': 'Don\'t Cross the Streams!',
-'MZ3': 'Something about a Star',
-'MZ4': 'Moonshot',
-'NI1': 'Alley of the Pressure Plates',
-'NI2': 'Egyptian Arcade',
-'NI3': 'A Fan Across Forever',
-'NI4': 'The Conservatory',
-'NI5': 'Armory',
-'NI6': 'Time Flies',
-'NJ1': 'Whole Lotta Jamming',
-'NJ2': 'Multiply Impossible Ascension',
-'NJ3': 'Jammer Quarantine',
-'NJ4': 'Circumlocution',
-'NL1': 'An Escalating Problem',
-'NL2': 'Deception',
-'NL3': 'A Door Too Far',
-'NL4': 'Two Pesky Little Buzzers',
-'NL5': 'Higher Ground',
-'NL6': 'Eagle\'s Nest',
-'NL7': 'A Box Up High',
-'NL8': 'Wrap Around the Corner',
-'NL9': 'Me, Myself and Our Two Jammers',
-'NO1': 'Windows into a Labyrinth',
-'NO2': 'A Ditch and a Fence',
-'NO3': 'Three Little Connectors... and a Fan',
-'NO4': 'Time Crawls',
-'NO5': 'Dumbwaiter',
-'NO6': 'The Seven Doors of Recording',
-'NO7': 'Carrier Pigeons',
-'NS1': 'Behind the Iron Curtain',
-'NS2': 'Rapunzel',
-'NS3': 'Oubliette',
-'NS4': 'Two Way Street',
-'NT1': 'Pinhole Windows',
-'NT2': 'Woosh!',
-'NT3': 'The Right Angle',
-'NT4': 'Redundant Power Supply',
-'NT5': 'Labyrinth',
-'NT6': 'Cemetery',
-'NT7': 'Big Stairs, Little Stairs',
-'NT8': 'Stables',
-'NT9': 'Throne Room',
-'NZ1': 'Friendly Crossfire',
-'NZ2': 'Bichromatic Entanglement',
-'NZ3': 'The Four Chambers of Flying',
-'NZ4': 'Blowback',
-'NZ5': 'The Short Wall',
-'NZ6': 'Weathertop',
-'T10': 'Just Doors and Windows',
-'T10': 'Up Close and Jammed',
-'T11': 'Prison Break',
-'T12': 'Crisscross Conundrum Advanced'
+from __future__ import print_function
+from time import sleep, time
+from re import match
+
+settings = {
+    "Split on return to Nexus": True,
+    "Split on tetromino collection": True,
+    "Split on star collection": False,
+    "Split on item unlocks": True,
+    "Split on tetromino world doors": False,
+    "Split on tetromino star doors": False,
+    "Split on tetromino tower doors": True,
+    "Split on star collection in the Nexus": False,
+    "Split on completing C*": False, # Community% completion
+    "Split on tetromino collection in A6": False,
+
+    "(DLC) Split on return to Hub": True,
+    "(DLC) Split on puzzle doors": False,
 }
 
-log = open('/Users/joe/Library/Application Support/Steam/SteamApps/common/The Talos Principle/Log/Talos.All.log', 'rb')
-start_time = None
-game_starting = 0
-current_world = None
-out = open('out.txt', 'wb')
-for line in log:
-    try:
-        time = int(line[0:2])*3600 + int(line[3:5])*60 + int(line[6:8])
-    except ValueError: # Malformed line
-        continue
-    if 'Stopping simulation' in line:
-        game_starting = 1
-    if game_starting == 1 and 'Starting Talos simulation' in line:
-        start_time = time
-        loads = 0.0
-        out.write('--- New Game started ')
-        game_starting = 2
-    if game_starting == 2 and 'Timestamp' in line:
-        out.write('at %s ---\n' % line[26:-1])
-        game_starting = 3
-    if game_starting < 3:
-        continue
-    timedelta = time-start_time
-    timestr = '%02d:%02d' % (timedelta/60, timedelta%60)
+variables = {
+    'currentWorld': "",
+    'gameStarting': False,
+    'introCutscene': False,
+    'lastLines': 0,
+    'doubleSplit': False,
+    'totalLoads': 0.0,
+    'adminEnding': False,
+}
 
-    if 'Started simulation' in line:
-        loads += float(line.split()[-2])
-    elif 'Picked:' in line:
-        puzzle_name = puzzles[line[-4:-1]]
-        out.write('%s : %s\n' % (timestr, puzzle_name))
-    elif 'Changing to' in line:
-        new_world = line.split('\'')[1]
-        if new_world == 'Content/Talos/Levels/Nexus.wld' \
-                and current_world is not None:
-            world_name = current_world.split('/')[-1][5:-4]
-            world_name = world_name.replace('_1_0', 'A')
-            world_name = world_name.replace('_2_0', 'B')
-            world_name = world_name.replace('_3_0', 'C')
-            out.write('\t%s : Exited %s\n' % (timestr, world_name))
-        current_world = new_world
-    elif 'solved in' in line:
-        out.write('\t%s : Unlocked %s\n' % (timestr, line.split('"')[1]))
-    elif current_world == 'Content/Talos/Levels/Islands_03.wld' \
-            and 'USER:' in line:
-        out.write('Run completed: %s\n' % timestr)
-        timedelta -= loads
-        out.write('Loadless time: %02d:%02d\n' % (timedelta/60, timedelta%60))
-    elif 'Core is shutting down' in line:
-        out.write('--- Game Shutdown ---\n')
-out.close()
+SPLITS = [
+    ['A Switch out of Reach', 10.0, 5.0],
+    ['Peephole', 20.0, 10.0],
+    ['Only the Two of Us', 30.0, 10.0],
+    ['Trio Bombasticus', 40.0, 5.0],
+    ['Poking a Sleeping Lion', 50.0, 5.0],
+    ['A1', 60.0, 5.0],
+    ['----', '----', '----'],
+]
+
+STATE = 'STOPPED'
+TIMER = None
+last_split = None
+FILE = '/Users/joe/Library/Application Support/Steam/SteamApps/common/The Talos Principle/Log/Talos.log'
+
+def update(line):
+    # Intro cutscene (booting up sequence) is excluded from IGT
+    if variables['introCutscene'] and line.startswith("Player profile saved"):
+        variables['totalLoads'] = time() - TIMER
+        variables['introCutscene'] = False
+    # Not removing the initial load (A1) because the run hasn't started yet
+    m = match("^Started simulation on '.*?' in ([\d\.]*) seconds", line)
+    if m and STATE == 'RUNNING':
+        load = float(m.group(1))
+        variables['totalLoads'] += load
+    return True
+
+def start(line):
+    # Only start for A1, since restore backup / continue should mostly be on other worlds.
+    if line.startswith("Started simulation on 'Content/Talos/Levels/Cloud_1_01.wld'"):
+        variables['gameStarting'] = True
+    # Ditto for Gehenna with the intro world.
+    if line.startswith("Started simulation on 'Content/Talos/Levels/DLC_01_Intro.wld'"):
+        variables.gameStarting = True
+    if variables['gameStarting'] and "sound channels reinitialized." in line:
+        variables['gameStarting'] = False
+        variables['introCutscene'] = True
+        return True
+
+def reset(line):
+    global variabes
+    if line == "Saving talos progress upon game stop.":
+        variables = {
+            'currentWorld': "",
+            'gameStarting': False,
+            'introCutscene': False,
+            'lastLines': 0,
+            'doubleSplit': False,
+            'totalLoads': 0.0,
+            'adminEnding': False,
+        }
+        return True
+
+def game_time():
+    if variables['introCutscene']:
+        return 0
+    return time() - TIMER - variables['totalLoads']
+
+def split(line):
+    # Map changes
+    if line.startswith("Changing over to"):
+        map_name = line[17:]
+        # Ensure 'restart checkpoint' doesn't trigger map change
+        if map_name != variables['currentWorld']:
+            variables['currentWorld'] = map_name
+            if map_name == "Content/Talos/Levels/Nexus.wld":
+                return settings["Split on return to Nexus"]
+            elif map_name == "Content/Talos/Levels/DLC_01_Hub.wld":
+                return settings["(DLC) Split on return to Hub"]
+            elif map_name == "Content/Talos/Levels/Cloud_3_08.wld":
+                variables['cStar'] = 0
+    # Sigil and star collection
+    if line.startswith("Picked:"):
+        if variables['doubleSplit']:
+            return False
+        variables['doubleSplit'] = True
+        if variables['currentWorld'] == "Content/Talos/Levels/Cloud_3_08.wld":
+            variables['cStar'] += 1 #Sigils collected while in C Star
+            if variables['cStar'] == 3:
+                return settings["Split on completing C*"]
+        if line[8:2] == "**":
+            if settings["Split on star collection"]:
+                return True
+            elif variables['currentWorld'] == "Content/Talos/Levels/Nexus.wld":
+                return settings["Split on star collection in the Nexus"]
+        elif variables['currentWorld'] == "Content/Talos/Levels/Cloud_1_06.wld":
+            return settings["Split on tetromino collection in A6"]
+        else:
+            return settings["Split on tetromino collection"]
+    else:
+        variables['doubleSplit'] = False # DLC Double-split prevention
+
+    # Arranger puzzles
+    if line.startswith('Puzzle "') and '" solved' in line:
+        puzzle = line[8:]
+        if puzzle.startswith("Mechanic"):
+            return settings["Split on item unlocks"]
+        elif puzzle.startswith("Door"):
+            return settings["Split on tetromino world doors"]
+        elif puzzle.startswith("SecretDoor"):
+            return settings["Split on tetromino star doors"]
+        elif puzzle.startswith("Nexus"):
+            return settings["Split on tetromino tower doors"]
+        elif puzzle.startswith("DLC_01_Secret"):
+            return settings["(DLC) Split on puzzle doors"]
+        elif puzzle.startswith("DLC_01_Hub"):
+            variables.adminEnding = True # Admin puzzle door solved, so the Admin is saved.
+            return settings["(DLC) Split on puzzle doors"]
+    if variables['currentWorld'] == "Content/Talos/Levels/Islands_03.wld": # Base game Messenger Ending
+        return line.startswith("USER:") # Line differs in languages.
+    elif variables['currentWorld'] == "Content/Talos/Levels/Nexus.wld": # Base game Transcendence and Eternalize Ending
+        return line == "USER: /transcend" or line == "USER: /eternalize"
+    if variables['currentWorld'] == "Content/Talos/Levels/DLC_01_Hub.wld": # Any DLC ending
+        if line == "Save Talos Progress: entered terminal":
+            variables['lastLines'] = 0
+        if line.startswith("USER:"):
+            variables['lastLines'] += 1
+            if variables['adminEnding']: # If admin is saved, it takes 5 lines to end the game
+                return variables['lastLines'] == 5
+            else: # In all other endings, game ends on the 4th dialogue after entering the terminal
+                return variables['lastLines'] == 4
+
+#### Mimics livesplit functionality
+def tail():
+    try: # Create the file if it doesn't exist
+        open(FILE, 'w')
+    except:
+        pass
+    with open(FILE, 'rb') as f:
+        f.seek(0, 2) # Go to EOF
+        while True:
+            lastLine = f.readline()
+            if not lastLine:
+                sleep(0.01)
+                continue
+            yield lastLine[15:].strip()
+
+for line in tail():
+    if update(line):
+        if STATE == 'RUNNING':
+            if not reset(line):
+                if split(line):
+                    name, pb, gold = SPLITS.pop(0)
+                    curr_time = game_time()
+                    time_string = '%02d:%05.2f [' % (curr_time/60, curr_time%60)
+                    delta = curr_time - pb
+                    time_string += '+' if delta > 0 else '-'
+                    time_string += '%02d:%05.2f] ' % (delta/60, delta%60)
+                    if curr_time - last_split < gold:
+                        print('current: %f last: %f gold: %f' % (curr_time, last_split, gold))
+                        time_string += '**%s**' % name
+                        gold = curr_time - last_split
+                    else:
+                        time_string += name
+                    last_split = curr_time
+                    print(time_string)
+                    SPLITS.append([name, last_split, gold])
+            else:
+                STATE = 'STOPPED'
+                TIMER = None
+                last_split = None
+                print('---- Run reset ----')
+                for split in SPLITS:
+                    print(split)
+        elif STATE == 'STOPPED':
+            if start(line):
+                STATE = 'RUNNING'
+                TIMER = time()
+                last_split = 0.0
+                print('---- Run started ----')
