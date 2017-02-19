@@ -43,6 +43,10 @@ TIMER = None
 last_split = None
 FILE = '/Users/joe/Library/Application Support/Steam/SteamApps/common/The Talos Principle/Log/Talos.log'
 
+def restore_splits_order():
+    while SPLITS[-1] != ['----', '----', '----']:
+        SPLITS.append(SPLITS.pop(0))
+
 def update(line):
     # Intro cutscene (booting up sequence) is excluded from IGT
     if variables['introCutscene'] and line.startswith("Player profile saved"):
@@ -190,6 +194,8 @@ for line in tail():
                 TIMER = None
                 last_split = None
                 print('---- Run reset ----')
+                
+                restore_splits_order()
                 for split in SPLITS:
                     print(split)
         elif STATE == 'STOPPED':
