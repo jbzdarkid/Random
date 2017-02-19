@@ -175,6 +175,7 @@ for line in tail():
                     time_string = '%02d:%05.2f [' % (curr_time/60, curr_time%60)
                     delta = curr_time - pb
                     time_string += '+' if delta > 0 else '-'
+                    delta = abs(delta)
                     time_string += '%02d:%05.2f] ' % (delta/60, delta%60)
                     if curr_time - last_split < gold:
                         print('current: %f last: %f gold: %f' % (curr_time, last_split, gold))
@@ -190,8 +191,8 @@ for line in tail():
                 TIMER = None
                 last_split = None
                 print('---- Run reset ----')
-                for split in SPLITS:
-                    print(split)
+                for SPLIT in SPLITS:
+                    print(SPLIT)
         elif STATE == 'STOPPED':
             if start(line):
                 STATE = 'RUNNING'
