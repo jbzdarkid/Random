@@ -190,8 +190,8 @@ for line in tail():
                 TIMER = None
                 last_split = None
                 print('---- Run reset ----')
-                for split in SPLITS:
-                    print(split)
+                for s in SPLITS:
+                    print(s)
         elif STATE == 'STOPPED':
             if start(line):
                 STATE = 'RUNNING'
