@@ -29,14 +29,14 @@ variables = {
 }
 
 SPLITS = [
-    ['A Switch out of Reach', 10.0, 5.0],
-    ['Peephole', 20.0, 10.0],
-    ['Only the Two of Us', 30.0, 10.0],
-    ['Trio Bombasticus', 40.0, 5.0],
-    ['Poking a Sleeping Lion', 50.0, 5.0],
-    ['A1', 60.0, 5.0],
-    ['----', '----', '----'],
+    ['A Switch out of Reach', 50.0, 30.0],
+    ['Peephole', 20.0, 20.0],
+    ['Only the Two of Us', 20.0, 20.0],
+    ['Trio Bombasticus', 30.0, 20.0],
+    ['Poking a Sleeping Lion', 30.0, 20.0],
+    ['A1', 10.0, 10.0],
 ]
+RUN_SPLITS = []
 
 STATE = 'STOPPED'
 TIMER = None
@@ -170,7 +170,7 @@ for line in tail():
         if STATE == 'RUNNING':
             if not reset(line):
                 if split(line):
-                    name, pb, gold = SPLITS.pop(0)
+                    name, pb, gold = SPLITS[len(RUN_SPLITS)]
                     curr_time = game_time()
                     time_string = '%02d:%05.2f [' % (curr_time/60, curr_time%60)
                     delta = curr_time - pb
@@ -178,21 +178,21 @@ for line in tail():
                     delta = abs(delta)
                     time_string += '%02d:%05.2f] ' % (delta/60, delta%60)
                     if curr_time - last_split < gold:
-                        print('current: %f last: %f gold: %f' % (curr_time, last_split, gold))
                         time_string += '**%s**' % name
                         gold = curr_time - last_split
                     else:
                         time_string += name
-                    last_split = curr_time
+                    RUN_SPLITS.append([name, curr_time-last_split, gold])
                     print(time_string)
-                    SPLITS.append([name, last_split, gold])
+                    last_split = curr_time
             else:
                 STATE = 'STOPPED'
                 TIMER = None
                 last_split = None
                 print('---- Run reset ----')
-                for SPLIT in SPLITS:
+                for SPLIT in RUN_SPLITS:
                     print(SPLIT)
+                RUN_SPLITS = []
         elif STATE == 'STOPPED':
             if start(line):
                 STATE = 'RUNNING'
