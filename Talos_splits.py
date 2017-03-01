@@ -191,7 +191,7 @@ for line in tail():
                 last_split = None
                 print('---- Run reset ----')
                 for SPLIT in RUN_SPLITS:
-                    print(SPLIT)
+                    print(str(SPLIT) + ',')
                 RUN_SPLITS = []
         elif STATE == 'STOPPED':
             if start(line):
