@@ -7,14 +7,15 @@ highlight ErrorMsg guibg='LightRed' guifg='LightRed'
 au InsertEnter * hi StatusLine term=reverse ctermbg=darkgreen
 au InsertLeave * hi StatusLine term=reverse ctermbg=green
 hi clear
-hi ColorColumn ctermbg=darkred
-hi Comment ctermfg=darkgray
-hi Constant ctermfg=darkmagenta
-hi Statement ctermfg=green
-hi LineNr ctermfg=green
 hi clear CursorLine
-hi CursorLineNr ctermfg=white
-hi PreProc ctermfg=darkgreen
+hi ColorColumn  ctermfg=none        ctermbg=darkred
+hi Comment      ctermfg=darkgray    ctermbg=none
+hi Constant     ctermfg=darkmagenta ctermbg=none
+hi CursorLineNr ctermfg=white       ctermbg=none
+hi LineNr       ctermfg=green       ctermbg=none
+hi PreProc      ctermfg=darkgreen   ctermbg=none
+hi Search       ctermfg=none        ctermbg=lightblue
+hi Statement    ctermfg=green       ctermbg=none
 set cursorline
 syntax enable
 
