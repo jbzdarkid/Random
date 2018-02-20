@@ -19,8 +19,9 @@ for shared_objects_dir in shared_objects_dirs:
 
 savefiles.sort()
 for dir, file_num, path in savefiles:
-  f = open(path).read()
+  f = open(path, 'rb').read()
   # 8 represents array, 0003 means 3 elements
   m = search('playtime\x08\x00\x00\x00\x03(.{36})', f)
-  print 'Save file %d from "%s":' % (file_num, dir),
-  print '\t%d:%02d:%02d' % unpack('>4xd4xd4xd', m.group(1))
+  if m:
+    print 'Save file %d from "%s":' % (file_num, dir),
+    print '\t%d:%02d:%02d' % unpack('>4xd4xd4xd', m.group(1))
