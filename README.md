@@ -30,3 +30,9 @@ A script for when2meet which changes their white-green to white-blue
 
 # Bandcamp download.py and Wattpad download.py
 Downloads files from Bandcamp and Wattpad respectively.
+
+# Braid.py
+Optimal puzzle solving for Braid
+
+# Talos_splits.py
+Non-livesplit method for timing splits
