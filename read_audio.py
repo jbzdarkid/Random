@@ -32,16 +32,23 @@ def convert(file):
   elif audio_type == 'wav':
     pass # See https://gist.github.com/zlorf/4c29170d59e74a7667f6
 
+
+def extract_sounds(package):
+  for file in package.namelist():
+    if not file.endswith('sound'):
+      continue
+    package.extract(file, path=TMP)
+    convert(TMP + '/' + file)
+    
 if __name__ == '__main__':
-  z = zipfile.ZipFile(ROOT + '.zip')
-  for file in z.namelist():
-    if file.endswith('sound'):
-      z.extract(file, path=TMP)
-      convert(TMP + '/' + file)
-    elif file.endswith('pkg'):
-      z.extract(file, path=TMP)
-      z2 = zipfile.ZipFile(TMP + '/' + file)
-      for file in z2.namelist():
-        if (file.endswith('sound')):
-          z2.extract(file, path=TMP)
-          convert(TMP + '/' + file)
+  package = zipfile.ZipFile(ROOT + '.zip')
+  extract_sounds(package)
+  for file in package.namelist():
+    if not file.endswith('pkg'):
+      continue
+    package.extract(file, path=TMP)
+    subpackage = zipfile.ZipFile(TMP + '/' + file)
+    extract_sounds(subpackage)
+    subpackage.close()
+    os.remove(TMP + '/' + file)
+  package.close()
