@@ -60,9 +60,11 @@ if &diff
   set diffopt+=iwhite
 endif
 
-"Jump to the last position when reopening a file
 if has("autocmd")
+  "Jump to the last position when reopening a file
   au BufReadPost * if line("'\"") > 1 && line("'\"") <= line("$") | exe "normal! g'\""
+  "Save all open, named files on defocus
+  au FocusLost * silent! wa
 endif
 
 "Affects the way selections work in visual modes
