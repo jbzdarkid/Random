@@ -12,7 +12,7 @@ hi clear CursorLine
 hi ColorColumn  ctermfg=none        ctermbg=darkred
 hi Comment      ctermfg=darkgray    ctermbg=none
 hi Constant     ctermfg=darkmagenta ctermbg=none
-hi CursorLineNr ctermfg=white       ctermbg=none
+hi CursorLineNr ctermfg=black       ctermbg=green
 hi LineNr       ctermfg=green       ctermbg=none
 hi PreProc      ctermfg=darkgreen   ctermbg=none
 hi Search       ctermfg=none        ctermbg=lightblue
