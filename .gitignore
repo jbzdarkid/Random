@@ -5,3 +5,15 @@
 tmp
 .DS_Store
 Bandcamp/Cover.jpg
+*.tlog
+imagecapture/mem/.vs/mem/v15/.suo
+*.db
+*.opendb
+*.ipch
+*.log
+*.obj
+*.pch
+*.pdb
+*.idb
+*.exe
+*.ilk

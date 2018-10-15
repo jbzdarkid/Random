@@ -12,7 +12,7 @@ def shift(release=False):
   # 1 for down, 2 for up
   keybd_event(160, 0, 1+(1*release), 0)
   sleep(0.1)
-  
+
 def move(left=False):
   # 68 for d, 65 for a
   keybd_event(68-(3*left), 0, 1, 0)
@@ -26,7 +26,7 @@ def capture(name):
   Beep(200, 100)
   sleep(0.1)
 
- 
+
 print 'starting in 10'
 for i in xrange(10):
   Beep(1000-50*i, 100)
