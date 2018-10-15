@@ -2,7 +2,7 @@
 #include "Memory.h"
 #include <cmath>
 
-void main()
+int main()
 {
 	/*
 	INPUT ip[2] = { 0 };
@@ -16,9 +16,8 @@ void main()
 	*/
 
 	Memory memory("witness64_d3d11.exe");
-
 	memory.SetNoclip(true);
-	memory.SetAngle(0, -1.57079632679); // -pi/2
+	memory.SetAngle(0, -1.57079632679f); // -pi/2
 
 	// Loop through positions or something
 
