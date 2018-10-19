@@ -5,8 +5,6 @@ from subprocess import check_output
 from os import system
 import win32gui, win32ui, win32con, win32api
 # TODO: Automatic photomerge? -- working on it
-# TODO: Try Z=25 mapping for town
-# Crop capture() to square
 # Maybe crop capture further to avoid some lens distortion? 50% square might work.
 
 def mem(*params):
@@ -18,67 +16,62 @@ def mem(*params):
 
 srcdc = win32ui.CreateDCFromHandle(win32gui.GetWindowDC(win32gui.GetDesktopWindow()))
 def capture(name):
-  sleep(2.0)
   Beep(200, 100)
+  sleep(0.5)
+
+  # https://stackoverflow.com/a/4589290
+  mid = (-1920, 10)
+  width = 1500
+  height = 1500
+  left = mid[0] - width//2
+  top = mid[1] - height//2
+
   bmp = win32ui.CreateBitmap()
-  bmp.CreateCompatibleBitmap(srcdc, 3840, 2150)
+  bmp.CreateCompatibleBitmap(srcdc, width, height)
 
   memdc = srcdc.CreateCompatibleDC()
   memdc.SelectObject(bmp)
-  memdc.BitBlt((0, 0), (3840, 2150), srcdc, (-3840, -1070), win32con.SRCCOPY)
+  memdc.BitBlt((0, 0), (width, height), srcdc, (left, top), win32con.SRCCOPY)
   bmp.SaveBitmapFile(memdc, f'photos/{name}.bmp')
 
-def recurse_photos(x, y, z, name, depth):
-  if depth == 0:
-    return
-  recurse_photos(x - z/8, y - z/8, z/2, name + '0', depth - 1)
-  recurse_photos(x - z/8, y + z/8, z/2, name + '1', depth - 1)
-  recurse_photos(x + z/8, y - z/8, z/2, name + '2', depth - 1)
-  recurse_photos(x + z/8, y + z/8, z/2, name + '3', depth - 1)
-
-  print(x, y, z, depth)
-  mem('pos', x, y, z)
-  #capture(f'{depth}_{name}')
-
-z = 2/3z
-
-  # system('.\photomerge.vbs')
-"""
-0 0 75 2
--12.5 -12.5 50.0 1
--12.5 12.5 50.0 1
-12.5 -12.5 50.0 1
-12.5 12.5 50.0 1
-"""
 print('starting in 10')
-for i in range(0):
+for i in range(10):
   Beep(1000-50*i, 100)
   sleep(1)
 
 mem('noclip', 1)
 mem('angle', 0, -pi/2)
+mem('pos', 0, 0, 0)
+sleep(2.0)
 
-recurse_photos(0, 0, 100, '', 2)
-
+# TODO: Try Z=25 mapping for town
+# 1500x1500 is too small, and 25 might be too low. Too much detail is actually a bad thing here.
+z = 25
+spacing = 5
+for x in range(0, -40, -2*spacing):
+  for y in range(0, -30, -spacing):
+    mem('pos', x, y, z)
+    capture(f'{x}_{y}_{z}')
+  x -= spacing
+  for y in range(-25, 5, spacing):
+    mem('pos', x, y, z)
+    capture(f'{x}_{y}_{z}')
 """
-# Scale: 1:4
-mem('pos', -384, -384, 256);
-mem('pos', -384, -128, 256);
-mem('pos', -384, 128, 256);
-mem('pos', -384, 384, 256);
 
-mem('pos', -128, -384, 256);
-mem('pos', -128, -128, 256);
-mem('pos', -128, 128, 256);
-mem('pos', -128, 384, 256);
+from PIL import Image
+width = 1000
+height = 1000
+crop_box = (
+  1920 - width//2, # left
+  1080 - height//2, # top
+  1920 + width//2, # right
+  1080 + height//2, # bottom
+)
 
-mem('pos', 128, -384, 256);
-mem('pos', 128, -128, 256);
-mem('pos', 128, 128, 256);
-mem('pos', 128, 384, 256);
-
-mem('pos', 384, -384, 256);
-mem('pos', 384, -128, 256);
-mem('pos', 384, 128, 256);
-mem('pos', 384, 384, 256);
+z = 25
+for x in range(-2, -10, -4):
+  for y in range(-2, -10, -4):
+    im = Image.open(f'photos/{x}_{y}_{z}.bmp')
+    im2 = im.crop(crop_box)
+    im2.save(f'photos2/{x}_{y}_{z}.bmp')
 """
