@@ -1,3 +1,14 @@
+from __future__ import print_function
+from sys import version_info
+if version_info[0] < 3:
+  from Queue import Empty, PriorityQueue
+  from sys import maxint
+else:
+  from queue import Empty, PriorityQueue
+  from sys import maxsize as maxint
+from threading import Lock, Thread
+from time import time
+
 DEBUG = False
 checks = [0, 0, 0, 0]
 
@@ -112,10 +123,6 @@ def doubleIter(xmax, ymax, start=(0, 0)):
     for y in range(0, ymax):
       yield (x, y)
 
-from Queue import Empty, PriorityQueue
-from sys import maxint
-from threading import Lock, Thread
-from time import time
 global uuidlock
 uuidlock = Lock()
 def getUUID():
@@ -129,17 +136,20 @@ def getUUID():
 class PartialSolution(Thread):
   def __init__(self, root=None):
     if root != None:
-      self.board, self.board_h, self.board_w, self.pieces, self.steps, self.parity, self.x, self.y, self.uuid = root
+      self.board, self.board_h, self.board_w, self.pieces, self.steps, self.parity, self.x, self.y, self.uuid, self.cost = root
       return
     super(PartialSolution, self).__init__()
 
+  def __gt__(self, other):
+    return self.cost > other.cost
+
   def debug(self):
-    print 'UUID:', self.uuid
-    print 'Board:'
+    print('UUID:', self.uuid)
+    print('Board:')
     self.printBoard()
-    print 'Cost:', self.cost
-    print 'Pieces:', self.pieces
-    print 'Steps:', self.steps
+    print('Cost:', self.cost)
+    print('Pieces:', self.pieces)
+    print('Steps:', self.steps)
 
   def clone(self):
     return PartialSolution(root=(
@@ -152,6 +162,7 @@ class PartialSolution(Thread):
       self.x,
       self.y,
       getUUID(),
+      self.cost
       ))
 
   # Returns True if the point is out of bounds or if the point is filled.
@@ -180,7 +191,7 @@ class PartialSolution(Thread):
     elif board[x][y] == '|' and char == '-':
       board[x][y] = '+'
 
-  def printBoard(self, simple=False, size=5):
+  def printBoard(self, simple=False, size=4):
     global pieces
     # Board2 is reconstructed from the piece placement steps
     board2 = [[-1 for _ in range(self.board_w)] for __ in range(self.board_h)]
@@ -197,7 +208,7 @@ class PartialSolution(Thread):
     if simple:
       chars = '_1234567890ABCDEF'
       for row in board2:
-        print ''.join(chars[i+1] for i in row)
+        print(''.join(chars[i+1] for i in row))
       return
 
     # Board3 is constructed from board 2. It's just prettier :)
@@ -237,31 +248,31 @@ class PartialSolution(Thread):
         for i in range(size):
           self.setPrintableBoard(board3, x*size+i, (y+1)*size*2, '|')
 
+    print(self.cost)
     for line in board3:
-      print ''.join(line)
+      print(''.join(line))
 
   # Done with helper functions, real code starts here
   def run(self):
     while True:
       global q, pieces
       try:
-        _cost, self = q.get(True, 1)
-        self.cost = _cost
+        self = q.get(True, 1)
       except Empty:
         if DEBUG:
-          print 'Queue empty'
+          print('Queue empty')
         return
       if DEBUG:
         self.debug()
       global maxCost
       if self.cost > maxCost:
         if DEBUG:
-          print 'cost > maxCost: %d > %d' % (self.cost, maxCost)
+          print('cost > maxCost:', self.cost, '>', maxCost)
         continue
       # Completed solution, since all pieces are placed
       if len(self.pieces) == len(self.steps):
         if DEBUG:
-          print '(complete solution)'
+          print('(complete solution)')
         global solutions, MAXSOLNS
         if MAXSOLNS != 'All': # Don't update max cost
           maxCost = min(maxCost, self.cost)
@@ -275,7 +286,7 @@ class PartialSolution(Thread):
         if not self.getBoard(self.x, self.y):
           break
       if DEBUG:
-        print 'First free space (x,y):', self.x, self.y
+        print('First free space (x,y):', self.x, self.y)
       self.attempted_pieces = []
       for rotation in range(0, 4):
         for pieceNum in range(len(self.pieces)):
@@ -293,7 +304,7 @@ class PartialSolution(Thread):
             newSolution = self.clone()
 
             if DEBUG:
-              print 'Attempting to place piece', pieceName, 'with rotation', (initialRotation+rotation)%4
+              print('Attempting to place piece', pieceName, 'with rotation', (initialRotation+rotation)%4)
               invalid = False
 
             # Now we start checking for invalid states.
@@ -304,7 +315,7 @@ class PartialSolution(Thread):
                 # Bounds check and Collision
                 if self.isInvalid(self.x+i, self.y+j-offset):
                   if DEBUG:
-                    print 'Failed check #1'
+                    print('Failed check #1')
                     checks[0] += 1
                   raise StopIteration
                 newSolution.setBoard(self.x+i, self.y+j-offset)
@@ -319,7 +330,7 @@ class PartialSolution(Thread):
                       newSolution.isInvalid(i+1, j) and
                       newSolution.isInvalid(i-1, j)):
                     if DEBUG:
-                      print 'Failed check #2'
+                      print('Failed check #2')
                       checks[1] += 1
                       invalid = True
                     else:
@@ -341,7 +352,7 @@ class PartialSolution(Thread):
                 if fullCol:
                   if spaces%4 != 0:
                     if DEBUG:
-                      print 'Failed check #3'
+                      print('Failed check #3')
                       checks[2] += 1
                       invalid = True
                     else:
@@ -356,7 +367,7 @@ class PartialSolution(Thread):
               parity = (self.x+self.y) % 2
               if self.parity[parity] == 0:
                 if DEBUG:
-                  print 'Failed check #4'
+                  print('Failed check #4')
                   checks[3] += 1
                   invalid = True
                 else:
@@ -368,7 +379,7 @@ class PartialSolution(Thread):
 
             # Passed all checks
             if DEBUG:
-              print 'Success, added %d to the queue.' % newSolution.uuid
+              print('Success, added', newSolution.uuid, 'to the queue.')
             newSolution.pieces[pieceNum] = None
             newSolution.steps.append((pieceNum, rotation))
 
@@ -376,8 +387,15 @@ class PartialSolution(Thread):
             # 2 rotations has a small cost, but can be done during placement
             # 3 rotations takes slightly longer, since it requires a delay
             cost = [0, 0, 1, 2.1][rotation]
+
+            # In Sigils of Elohim, there's no right-click pickup, nor space rotates.
+            # 0 is still free, of course
+            # 1 is relatively free
+            # 2 and 3 are painful, each additional rotation equally so
+            # cost = [0, 0.1, 1.1, 2.1][rotation]
             if self.cost + cost <= maxCost:
-              q.put((self.cost + cost, newSolution))
+              newSolution.cost += cost
+              q.put(newSolution)
           except StopIteration:
             pass
       q.task_done()
@@ -404,13 +422,13 @@ def solve(challenges, NUMTHREADS=4, _MAXSOLNS=maxint, quiet=False):
       pieces[i] = (pieces[i], 0)
 
     if not quiet:
-      print 'Challenge "{name}" using {num} pieces: {pieces}'.format(name=title, num = len(pieces), pieces=', '.join([a+str(b) for a,b in pieces]))
+      print('Challenge "{name}" using {num} pieces: {pieces}'.format(name=title, num = len(pieces), pieces=', '.join([a+str(b) for a,b in pieces])))
     startTime = time()
 
     global q
     q = PriorityQueue()
-    # cost, PartialSolution(root=(board, board_h, board_w, pieces, steps, parity, x, y, uuid))
-    q.put((0, PartialSolution(root=(0L, data[1], data[2], list(pieces), [], [TCount/2, TCount/2], 0, 0, uuid))))
+    # cost, PartialSolution(root=(board, board_h, board_w, pieces, steps, parity, x, y, uuid, cost))
+    q.put(PartialSolution(root=(0, data[1], data[2], list(pieces), [], [TCount/2, TCount/2], 0, 0, uuid, 0)))
     threads = []
     for i in range(NUMTHREADS):
       thread = PartialSolution()
@@ -420,11 +438,11 @@ def solve(challenges, NUMTHREADS=4, _MAXSOLNS=maxint, quiet=False):
       thread.join()
     runtime = time()-startTime
     if not quiet:
-      print 'Took %d seconds using %d partials.' % (runtime, uuid)
+      print('Took', runtime, 'seconds using', uuid, 'partials.')
       if maxCost != maxint:
-        print 'Minimal solution cost: %d' % maxCost
+        print('Minimal solution cost:', maxCost)
       if len(solutions) > 0:
-        print 'Found %d solutions:' % len(solutions)
+        print('Found', len(solutions), 'solutions:')
       solutions.sort(key=lambda s: s.steps)
       for solution in solutions:
         solution.printBoard()
@@ -452,9 +470,9 @@ if __name__ == "__main__":
   #   except KeyError:
   #     solveData2[cost] = [puzzle]
   # del solveData2[0]
-  # print 'List of all %dx4 puzzles by difficulty (hardest first):' % N
+  # print('List of all %dx4 puzzles by difficulty (hardest first):' % N)
   # for cost in sorted(solveData2.keys()):
-  #   print '%d: %s' % (cost, ' '.join(solveData2[cost]))
+  #   print(cost, ' '.join(solveData2[cost]))
   # exit(0)
   challenges = {
     # 'Name': ['Pieces', Height, Width],
@@ -516,4 +534,4 @@ if __name__ == "__main__":
   }
   solve(challenges, 16, 1)
   if DEBUG:
-    print checks
+    print(checks)
