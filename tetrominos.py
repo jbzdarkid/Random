@@ -113,6 +113,45 @@ tetrominos = {
      [1, 0]]),
   ('Z', 2): ('!', 'Invalid'),
   ('Z', 3): ('!', 'Invalid'),
+#----------------------------
+# Little j and little t are 2x rotated (for SOE)
+  ('j', 0):
+    (0,
+    [[1, 1, 1],
+     [0, 0, 1]]),
+  ('j', 1):
+    (1,
+    [[0, 1],
+     [0, 1],
+     [1, 1]]),
+  ('j', 2):
+    (0,
+    [[1, 0, 0],
+     [1, 1, 1]]),
+  ('j', 3):
+    (0,
+    [[1, 1],
+     [1, 0],
+     [1, 0]]),
+#----------------------------
+  ('t', 0):
+    (1,
+    [[0, 1, 0],
+     [1, 1, 1]]),
+  ('t', 1):
+    (0,
+    [[1, 0],
+     [1, 1],
+     [1, 0]]),
+  ('t', 2):
+    (0,
+    [[1, 1, 1],
+     [0, 1, 0]]),
+  ('t', 3):
+    (1,
+    [[0, 1],
+     [1, 1],
+     [0, 1]]),
 }
 
 def doubleIter(xmax, ymax, start=(0, 0)):
@@ -526,6 +565,39 @@ if __name__ == "__main__":
     # 'Fourth Dimension Exit':  ['LL',         4, 2],
     # 'Fourth Dimension Star':  ['JLSZZ',      5, 4],
     # 'This is the only Level': ['TTTTTTS',    7, 4],
+
+    # 'SoE A Blue 1':           ['LLZZ',          4, 4],
+    # 'SoE A Blue 2':           ['ILjS',          4, 4],
+    # 'SoE A Blue 3':           ['ILStt',         5, 4],
+    # 'SoE A Blue 4':           ['jLSZZ',         5, 4],
+    # 'SoE A Blue 5':           ['ILtt',          4, 4],
+    # 'SoE A Blue 6':           ['LSttZ',         4, 5],
+    # 'SoE A Blue 7':           ['jSttZ',         5, 4],
+    # 'SoE A Blue 8':           ['IjOttZ',        6, 4],
+    # 'SoE A Green 1':          ['ILOttZ',        6, 4],
+    # 'SoE A Green 2':          ['IjjLttZ',       4, 7],
+    # 'SoE A Green 3':          ['IjLOSZ',        6, 4],
+    # 'SoE A Green 4':          ['IjLOOtttt',     6, 6],
+    # 'SoE A Green 5':          ['LLLLOtttt',     6, 6],
+    # 'SoE A Green 6':          ['IIIIjjLLSZ',    8, 5],
+    # 'SoE A Green 7':          ['IIjLSttttZ',    8, 5],
+    # 'SoE A Green 8':          ['jLOOSSttttZZ',  8, 6],
+    # 'SoE A Yellow 1':         ['IjLOOSSZZ',     6, 6],
+    # 'SoE A Yellow 2':         ['IjjjLLOOttZZ',  8, 6],
+    # 'SoE A Yellow 3':         ['IjLttZZ',       4, 7],
+    # 'SoE A Yellow 4':         ['jLLtt',         5, 4],
+    # 'SoE A Yellow 5':         ['LSttZ',         5, 4],
+    # 'SoE A Yellow 6':         ['IjjLLOOZZ',     6, 6],
+    # 'SoE A Yellow 7':         ['ILLOOStttt',   10, 4],
+    # 'SoE A Yellow 8':         ['IILLOSttZZ',    8, 5],
+    # 'SoE A Red 1':            ['IjLLOOStt',     6, 6],
+    # 'SoE A Red 2':            ['jjLLttZZZ',     6, 6],
+    # 'SoE A Red 3':            ['IjjOO',         5, 4],
+    # 'SoE A Red 4':            ['IjjjLLOOSStt',  6, 8],
+    # 'SoE A Red 5':            ['ILttZ',         5, 4],
+    # 'SoE A Red 6':            ['IIjSttttZZ',   10, 4],
+    # 'SoE A Red 7':            ['IILSttZ',       4, 7],
+    # 'SoE A Red 8':            ['IjjjOOSttZZZ',  6, 8],
 
     # 'Hardest 6x4': ['IJLOSZ', 6, 4],
     # 'Hardest 8x4': ['IJLOSSSZ', 8, 4],
