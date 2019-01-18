@@ -162,7 +162,6 @@ def doubleIter(xmax, ymax, start=(0, 0)):
     for y in range(0, ymax):
       yield (x, y)
 
-global uuidlock
 uuidlock = Lock()
 def getUUID():
   global uuid
@@ -222,7 +221,7 @@ class PartialSolution(Thread):
     self.board |= 2 << (x*self.board_w + y)
 
   # Helper method for printBoard, used in construction of board3
-  def setPrintableBoard(self, board, x, y, char):
+  def setPrintableBoard(board, x, y, char):
     if board[x][y] == '/':
       board[x][y] = char
     elif board[x][y] == '-' and char == '|':
@@ -259,33 +258,33 @@ class PartialSolution(Thread):
     for x, y in doubleIter(len(board2), len(board2[x])):
       if board2[x][y] != -1: # Piece internal
         for i, j in doubleIter(size-1, size*2-1):
-          self.setPrintableBoard(board3, x*size+i+1, y*size*2+j+1, ' ')
+          setPrintableBoard(board3, x*size+i+1, y*size*2+j+1, ' ')
         if x > 0 and board2[x][y] == board2[x-1][y]: # Piece internal row
           for j in range(1, size*2):
-            self.setPrintableBoard(board3, x*size, y*size*2+j, ' ')
+            setPrintableBoard(board3, x*size, y*size*2+j, ' ')
         if y > 0 and board2[x][y] == board2[x][y-1]: # Piece internal column
           for i in range(1, size):
-            self.setPrintableBoard(board3, x*size+i, y*size*2, ' ')
+            setPrintableBoard(board3, x*size+i, y*size*2, ' ')
         if x > 0 and y > 0 and board2[x][y] == board2[x-1][y] and board2[x][y] == board2[x][y-1]: # O piece internal
-          self.setPrintableBoard(board3, x*size, y*size*2, ' ')
+          setPrintableBoard(board3, x*size, y*size*2, ' ')
       if x == 0: # Top row
         for j in range(size*2):
-          self.setPrintableBoard(board3, x*size, y*size*2+j, '-')
+          setPrintableBoard(board3, x*size, y*size*2+j, '-')
       elif board2[x][y] != board2[x-1][y]: # Internal row
         for j in range(size*2+1):
-          self.setPrintableBoard(board3, x*size, y*size*2+j, '-')
+          setPrintableBoard(board3, x*size, y*size*2+j, '-')
       if x == self.board_h-1: # Bottom row
         for j in range(size*2):
-          self.setPrintableBoard(board3, (x+1)*size, y*size*2+j, '-')
+          setPrintableBoard(board3, (x+1)*size, y*size*2+j, '-')
       if y == 0: # Left column
         for i in range(size):
-          self.setPrintableBoard(board3, x*size+i, y*size*2, '|')
+          setPrintableBoard(board3, x*size+i, y*size*2, '|')
       elif board2[x][y] != board2[x][y-1]: # Internal column
         for i in range(size+1):
-          self.setPrintableBoard(board3, x*size+i, y*size*2, '|')
+          setPrintableBoard(board3, x*size+i, y*size*2, '|')
       if y == self.board_w-1: # Right column
         for i in range(size):
-          self.setPrintableBoard(board3, x*size+i, (y+1)*size*2, '|')
+          setPrintableBoard(board3, x*size+i, (y+1)*size*2, '|')
 
     print(self.cost)
     for line in board3:
@@ -455,10 +454,10 @@ def solve(challenges, NUMTHREADS=4, _MAXSOLNS=maxint, quiet=False):
     pieces = list(data[0])
 
     TCount = 0
-    for i in range(len(pieces)):
-      if pieces[i] == 'T':
+    for i, piece in enumerate(pieces):
+      if piece == 'T':
         TCount += 1
-      pieces[i] = (pieces[i], 0)
+      pieces[i] = (piece, 0)
 
     if not quiet:
       print('Challenge "{name}" using {num} pieces: {pieces}'.format(name=title, num = len(pieces), pieces=', '.join([a+str(b) for a,b in pieces])))
