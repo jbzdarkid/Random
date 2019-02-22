@@ -58,23 +58,29 @@ for xml_segment in xml_segments:
     attempts[id]['segments'].append(attempts[id]['cumulative'])
 
 pb = timedelta(hours=9999)
-for k in attempts:
-  if attempts[k]['cumulative'] == timedelta(seconds=0):
+for id in list(attempts.keys()):
+  if attempts[id]['cumulative'] == timedelta(seconds=0):
+    del attempts[id]
     continue
-  if attempts[k]['cumulative'] < pb:
-    pb_id = k
-    pb = attempts[k]['cumulative']
+  if attempts[id]['cumulative'] < pb:
+    pb_id = id
+    pb = attempts[id]['cumulative']
 
 print('Detected PB on attempt #' + pb_id + ': ' + to_string(pb))
 
+print('Updating final times for attempts...')
 for xml_attempt in xml_attempt_history:
-  if len(xml_attempt) == 0:
-    continue # Only consider completed attempts
-  xml_attempt.find('RealTime').text = to_string(attempts[data['id']]['cumulative'])
+  id = xml_attempt.attrib['id']
+  if id not in attempts:
+    continue
+  old_time = xml_attempt.find('RealTime').text
+  new_time = to_string(attempts[id]['cumulative'])
+  if not old_time == new_time:
+    print('Updating attempt #' + id + ' from ' + old_time + ' to ' + new_time)
+    xml_attempt.find('RealTime').text = new_time
 
 print('Reprocessing splits...')
 for i in range(len(xml_segments)):
-  print('Split #' + str(i) + ': ' + xml_segments[i].find('Name').text)
   split_time = xml_segments[i].find('SplitTimes').find('SplitTime')
   real_time = split_time.find('RealTime')
 
@@ -82,6 +88,10 @@ for i in range(len(xml_segments)):
   if pb_segment is None: # Skipped split in PB
     split_time.remove(real_time)
   else:
-    real_time.text = to_string(pb_segment)
+    old_time = real_time.text
+    new_time = to_string(pb_segment)
+    if not old_time == new_time:
+      print('Updating split #' + str(i) + ' (' + xml_segments[i].find('Name').text + ') from ' + old_time + ' to ' + new_time)
+      real_time.text = new_time
 
 tree.write('The_Witness_-_Any.lss')
