@@ -23,10 +23,10 @@ def parse_time(date_string):
   )
 
 def to_string(delta):
-  dt = datetime(1970,1,1) + delta
+  dt = datetime(1970, 1, 1) + delta
   return datetime.strftime(dt, '%H:%M:%S.%f0')
 
-tree = ET.parse('GGSD-original.lss')
+tree = ET.parse('The_Witness_-_Any.lss')
 root = tree.getroot()
 
 xml_attempt_history = root.find('AttemptHistory')
@@ -43,6 +43,8 @@ for xml_attempt in xml_attempt_history:
   }
   attempts[data['id']] = data
 
+print('Found ' + str(len(attempts)) + ' completed attempts')
+
 for xml_segment in xml_segments:
   for xml_attempt in xml_segment.find('SegmentHistory'):
     id = xml_attempt.attrib['id']
@@ -57,16 +59,22 @@ for xml_segment in xml_segments:
 
 pb = timedelta(hours=9999)
 for k in attempts:
+  if attempts[k]['cumulative'] == timedelta(seconds=0):
+    continue
   if attempts[k]['cumulative'] < pb:
     pb_id = k
     pb = attempts[k]['cumulative']
+
+print('Detected PB on attempt #' + pb_id + ': ' + to_string(pb))
 
 for xml_attempt in xml_attempt_history:
   if len(xml_attempt) == 0:
     continue # Only consider completed attempts
   xml_attempt.find('RealTime').text = to_string(attempts[data['id']]['cumulative'])
 
+print('Reprocessing splits...')
 for i in range(len(xml_segments)):
+  print('Split #' + str(i) + ': ' + xml_segments[i].find('Name').text)
   split_time = xml_segments[i].find('SplitTimes').find('SplitTime')
   real_time = split_time.find('RealTime')
 
@@ -76,4 +84,4 @@ for i in range(len(xml_segments)):
   else:
     real_time.text = to_string(pb_segment)
 
-tree.write('GGSD-mod.lss')
+tree.write('The_Witness_-_Any.lss')
