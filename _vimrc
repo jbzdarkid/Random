@@ -1,7 +1,7 @@
 autocmd FileType gitcommit setlocal spell "Spell check on git commit messages
 autocmd FileType txt setlocal spell "Spell check on all .txt files
 autocmd FileType md setlocal spell "Spell check on all .txt files
-match ErrorMsg '\s\+$' "Highlight EOL whitespace as error
+"match ErrorMsg '\s\+$' "Highlight EOL whitespace as error
 if &cp | set nocp | endif
 
 "Colorscheme (Changes as needed)
@@ -12,14 +12,14 @@ hi clear CursorLine
 hi ColorColumn  ctermfg=none        ctermbg=darkred
 hi Comment      ctermfg=darkgray    ctermbg=none
 hi Constant     ctermfg=darkmagenta ctermbg=none
-hi CursorLineNr ctermfg=black       ctermbg=green
+hi CursorLineNr ctermfg=black       ctermbg=darkgreen
 hi LineNr       ctermfg=green       ctermbg=none
 hi PreProc      ctermfg=darkgreen   ctermbg=none
 hi Search       ctermfg=none        ctermbg=lightblue
 hi Statement    ctermfg=brown       ctermbg=none
 hi Type         ctermfg=blue        ctermbg=none
 set cursorline
-syntax enable
+"syntax enable "This is causing me trouble. I need to start clean, I think
 
 set autochdir
 set backspace=indent,eol,start
@@ -40,7 +40,7 @@ set number
 set scrolloff=5
 set selection=inclusive "Exclusive might be better?
 set shiftround
-set shiftwidth=2
+set shiftwidth=4
 set smartcase
 set smartindent
 set smarttab
@@ -56,13 +56,16 @@ set lines=80 columns=249
 
 "Larger window for vimdiff
 if &diff
-  set lines=100 columns=300
+  "set lines=100 columns=300 "Not working :(
   set diffopt+=iwhite
+  syntax off
 endif
 
 if has("autocmd")
   "Jump to the last position when reopening a file
   au BufReadPost * if line("'\"") > 1 && line("'\"") <= line("$") | exe "normal! g'\""
+  "Strip trailing whitespace whenever we write (/e = silent)
+  au BufWritePre * %s/\s\+$//e
   "Save all open, named files on defocus
   au FocusLost * silent! wa
 endif
