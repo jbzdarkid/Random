@@ -18,10 +18,10 @@ esp -= 16
 [esp] = 0x1579685C
 eax = func_6640318()
 esp += 16
-14428A06 | mov dword ptr ds:[eax+0x8],0x1A2424B0
-14428A0D | mov edi,eax
-14428A0F | mov dword ptr ss:[ebp-0x70],0x0
-14428A16 | jmp 0x14428B2B
+[eax+0x08] = 0x1A2424B0
+edi = eax
+[esp+0x0C] = 0
+goto 14428B2B
 14428A1B | lea esp,dword ptr ss:[esp]
 14428A1F | nop
 14428A20 | call 0x1440C890
@@ -129,6 +129,7 @@ esp += 16
 14428B1F | call 0x664D3B8
 14428B24 | add esp,0x10
 14428B27 | add dword ptr ss:[ebp-0x70],0x1
+label 14428B2B:
 14428B2B | call 0x1440C890
 14428B30 | mov ecx,eax
 14428B32 | cmp dword ptr ds:[ecx],ecx
