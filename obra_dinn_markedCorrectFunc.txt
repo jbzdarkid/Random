@@ -7,11 +7,10 @@ esp -= 0x7C // Allocate 124b (31B)
 [esp+0x48] = 0
 [esp+0x4C] = 0
 [esp+0x50] = 0
-esp -= 0x0C // Allocate another 12b (3B)
-esp -= 4
+esp -= 16
 [esp] = 0x1BF4E4E8
-144289E5 | call 0x6640318
-144289EA | add esp,0x10
+eax = func_6640318()
+esp += 16
 144289ED | mov dword ptr ss:[ebp-0x6C],eax
 144289F0 | mov ecx,dword ptr ss:[ebp+0xC]
 144289F3 | mov dword ptr ds:[eax+0x8],ecx
