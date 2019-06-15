@@ -7,8 +7,9 @@ esp -= 0x7C // Allocate 124b (31B)
 [esp+0x48] = 0
 [esp+0x4C] = 0
 [esp+0x50] = 0
-144289DD | sub esp,0xC
-144289E0 | push 0x1BF4E4E8
+esp -= 0x0C // Allocate another 12b (3B)
+esp -= 4
+[esp] = 0x1BF4E4E8
 144289E5 | call 0x6640318
 144289EA | add esp,0x10
 144289ED | mov dword ptr ss:[ebp-0x6C],eax
