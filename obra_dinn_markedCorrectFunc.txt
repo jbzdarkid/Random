@@ -11,9 +11,9 @@ esp -= 16
 [esp] = 0x1BF4E4E8
 eax = func_6640318()
 esp += 16
-144289ED | mov dword ptr ss:[ebp-0x6C],eax
-144289F0 | mov ecx,dword ptr ss:[ebp+0xC]
-144289F3 | mov dword ptr ds:[eax+0x8],ecx
+[esp+0x10] = eax
+ecx = [ebp+0x0C] // Function argument 2? (+4 = return addr, +8 = arg0, +12 = arg1)
+[eax+0x08] = ecx
 144289F6 | sub esp,0xC
 144289F9 | push 0x1579685C
 144289FE | call 0x6640318
