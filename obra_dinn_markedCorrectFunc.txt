@@ -7,17 +7,21 @@ esp -= 0x7C // Allocate 124b (31B)
 [esp+0x48] = 0
 [esp+0x4C] = 0
 [esp+0x50] = 0
-esp -= 16
-[esp] = 0x1BF4E4E8
-eax = func_6640318()
-esp += 16
+{
+  esp -= 16
+  [esp] = 0x1BF4E4E8
+  eax = func_6640318()
+  esp += 16
+}
 [esp+0x10] = eax
 ecx = [ebp+0x0C] // Function argument 2? (+4 = return addr, +8 = arg0, +12 = arg1)
 [eax+0x08] = ecx
-esp -= 16
-[esp] = 0x1579685C
-eax = func_6640318()
-esp += 16
+{
+  esp -= 16
+  [esp] = 0x1579685C
+  eax = func_6640318()
+  esp += 16
+}
 [eax+0x08] = 0x1A2424B0
 edi = eax
 [esp+0x0C] = 0
@@ -25,13 +29,14 @@ goto 14428B2B
 14428A1B | lea esp,dword ptr ss:[esp]
 14428A1F | nop
 14428A20 | call 0x1440C890
-14428A25 | sub esp,0x8
-14428A28 | push dword ptr ss:[ebp-0x70]
-14428A2B | push eax
-14428A2C | cmp dword ptr ds:[eax],eax
-14428A2E | call 0x14428F18
-14428A33 | add esp,0x10
-14428A36 | mov dword ptr ss:[ebp-0x3C],eax
+{
+  esp -= 16
+  [esp + 0x4] = [ebp-0x70] // Note: Before modification, this was esp+0x0C
+  [esp] = eax
+  eax = func_14428F18()
+  esp += 16
+}
+[esp+0x40] = eax
 14428A39 | call 0x66D6830
 14428A3E | mov eax,dword ptr ds:[eax+0x1C]
 14428A41 | sub esp,0x8
