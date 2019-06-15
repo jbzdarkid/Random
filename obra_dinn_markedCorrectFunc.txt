@@ -1,9 +1,9 @@
-144289B8 | push ebp
-144289B9 | mov ebp,esp
-144289BB | push ebx
-144289BC | push edi
-144289BD | push esi
-144289BE | sub esp,0x7C
+func_144289B8()
+{
+// push ebp, ebx, edi, esi
+ebp = esp
+esp -= 0x7C // Allocate 124b (31B)
+// Note: ebp = esp + 0x7C
 144289C1 | mov dword ptr ss:[ebp-0x38],0x0
 144289C8 | mov dword ptr ss:[ebp-0x34],0x0
 144289CF | mov dword ptr ss:[ebp-0x30],0x0
