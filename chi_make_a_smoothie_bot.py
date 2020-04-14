@@ -16,8 +16,6 @@ async def on_ready():
     return
   client.started = True
 
-  print(f'Logged in as {client.user.name} (id: {client.user.id})')
-
   channel = client.get_channel(699493553444749367)
   sent_today = False
   while 1:
@@ -28,7 +26,7 @@ async def on_ready():
 
     if is_a_workday(tomorrow) and not sent_today and now.hour == 18: # 6 PM
       sent_today = True
-      message = await channel.send(content='Chi! Make a smoothie.')
+      message = await channel.send(content=f'<@&{client.user_id}>! Make a smoothie.')
 
     await sleep(60)
 
@@ -43,5 +41,7 @@ if __name__ == '__main__':
   else:
     with open(Path(__file__).parent / 'chi_make_a_smoothie_token.txt', 'r') as f:
       token = f.read().strip()
+    with open(Path(__file__).parent / 'chi_make_a_smoothie_user.txt', 'r') as f:
+      client.user_id = f.read().strip()
     client.run(token, reconnect=True)
 
