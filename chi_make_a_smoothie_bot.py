@@ -26,7 +26,7 @@ async def on_ready():
 
     if is_a_workday(tomorrow) and not sent_today and now.hour == 18: # 6 PM
       sent_today = True
-      message = await channel.send(content=f'<@&{client.user_id}>! Make a smoothie.')
+      message = await channel.send(content=f'<@{client.user_id}>! Make a smoothie.')
 
     await sleep(60)
 
