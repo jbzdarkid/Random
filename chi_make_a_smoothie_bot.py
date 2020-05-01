@@ -2,7 +2,7 @@ from asyncio import sleep
 import discord
 import subprocess
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 import sys
 from pathlib import Path
 
@@ -20,7 +20,7 @@ async def on_ready():
   sent_today = False
   while 1:
     now = datetime.now()
-    tomorrow = datetime(now.year, now.month, now.day + 1)
+    tomorrow = datetime(now.year, now.month, now.day) + timedelta(hours=24)
     def is_a_workday(day):
       return day.weekday() >= 0 and day.weekday() <= 4
 

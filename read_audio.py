@@ -1,10 +1,26 @@
 import zipfile
 import os.path
+import lz4.frame
 
 ROOT = 'C:/Program Files (x86)/Steam/steamapps/common/The Witness/data-pc'
 TMP = os.path.dirname(os.path.abspath(__file__)) + '/tmp'
 if not os.path.isdir(TMP):
   os.mkdir(TMP)
+
+def fix_file(data):
+  remainder = data[12:]
+  datalen = len(remainder)
+
+  B0 = datalen & 0xFF
+  B1 = (datalen >> 8) & 0xFF
+  B2 = (datalen >> 16) & 0xFF
+  B3 = (datalen >> 24) & 0xFF
+
+  #0x18 4C 21 02
+  prefix = [0x02, 0x21, 0x4C, 0x18, B0, B1, B2, B3]
+
+  final_data = prefix + list(remainder)
+  return bytearray(final_data)
 
 def convert(file):
   data = open(file, 'rb').read()
@@ -26,11 +42,16 @@ def convert(file):
   dest = file.replace('sound', audio_type)
   
   if audio_type == 'ogg' or (audio_type == 'wav' and offset == 16):
-    with open(dest, 'wb') as f:
-      f.write(data[offset:])
+    # with open(dest, 'wb') as f:
+    #   f.write(data[offset:])
     os.remove(file)
   elif audio_type == 'wav':
-    pass # See https://gist.github.com/zlorf/4c29170d59e74a7667f6
+    # data = fix_file(data)
+    # decompressed = lz4.frame.decompress(data)
+    # decompressed = decompressed[4:]
+    
+    pass
+
 
 
 def extract_sounds(package):
