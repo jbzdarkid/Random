@@ -17,7 +17,13 @@ async def on_ready():
   client.started = True
 
   channel = client.get_channel(699493553444749367)
+
   sent_today = False
+  async for message in channel.history(limit=10):
+    if message.author == client.user and datetime.now().day == message.created_at.day:
+      sent_today = True
+      break
+
   while 1:
     now = datetime.now()
     tomorrow = datetime(now.year, now.month, now.day) + timedelta(hours=24)
