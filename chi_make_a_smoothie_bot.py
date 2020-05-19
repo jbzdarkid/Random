@@ -20,7 +20,7 @@ async def on_ready():
 
   sent_today = False
   async for message in channel.history(limit=10):
-    if message.author == client.user and datetime.now().day == message.created_at.day:
+    if message.author == client.user and datetime.now() - message.created_at < timedelta(hours=3):
       sent_today = True
       break
 
@@ -42,7 +42,6 @@ if __name__ == '__main__':
   if 'subtask' not in sys.argv:
     while 1:
       subprocess.run([sys.executable, __file__, 'subtask'] + sys.argv)
-      # Speedrun.com throttling limit is 100 requests/minute
       time.sleep(60)
   else:
     with open(Path(__file__).parent / 'chi_make_a_smoothie_token.txt', 'r') as f:
