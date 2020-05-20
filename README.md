@@ -30,3 +30,6 @@ A script for when2meet which changes their white-green to white-blue
 
 # Bandcamp download.py and Wattpad download.py
 Downloads files from Bandcamp and Wattpad respectively.
+
+# chi_make_a_smoothie_bot.py
+Template for sending discord reminders on a regular cadence.
