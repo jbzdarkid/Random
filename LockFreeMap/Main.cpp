@@ -8,39 +8,41 @@
 
 using namespace std;
 
+int N = 100;
+
 int main() {
-    WRRMMap<int, string> map;
+    WRRMMap<int, wstring> map;
 
     vector<thread> threads;
-    for (int i=0; i<100; i++) {
+    for (int i=0; i<N; i++) {
         threads.push_back(thread([&map, i]{
             this_thread::sleep_for(chrono::milliseconds(10 + rand() % 10));
-            map.Update(i, "Value " + to_string(i));
+            map.Update(i, L"Value " + to_wstring(i));
         }));
     }
     for (auto& thread : threads) thread.join();
     wstring mapSize = std::to_wstring(map.Size()) + L'\n';
     OutputDebugString(mapSize.c_str());
 
-    string totalOutput;
+    wstring totalOutput;
     mutex outputMutex;
 
     threads.clear();
-    for (int i=0; i<100; i++) {
+    for (int i=0; i<N; i++) {
         threads.push_back(thread([&outputMutex, &totalOutput, &map, i]{
             this_thread::sleep_for(chrono::milliseconds(100 + rand() % 1000));
-            string output = to_string(i) + ": ";
+            wstring output = to_wstring(i) + L": ";
 
-            string value;
+            wstring value;
             if (map.Lookup(i, value)) {
                 output += value;
             } else {
-                output += "Not found";
+                output += L"Not found";
             }
             lock_guard<mutex> l(outputMutex);
-            totalOutput += output + "\n";
+            totalOutput += output + L'\n';
         }));
     }
     for (auto& thread : threads) thread.join();
-    OutputDebugStringA(totalOutput.c_str());
+    OutputDebugString(totalOutput.c_str());
 }

@@ -45,8 +45,9 @@ HazardPointer::HazardPointer() {
 
     // Else, there are no free nodes, create a new one
     _node = new HazardPointer::Node();
-    HazardPointer::Node* old = s_head.load();
+    HazardPointer::Node* old;
     do {
+        old = s_head.load();
         _node->next = old;
     } while (!CAS(s_head, old, _node));
     return;
