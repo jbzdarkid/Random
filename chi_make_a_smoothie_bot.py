@@ -5,7 +5,9 @@ import time
 from datetime import datetime, timedelta
 import sys
 from pathlib import Path
+import holidays
 
+us_holidays = holidays.UnitedStates()
 client = discord.Client()
 client.started = False
 
@@ -28,7 +30,7 @@ async def on_ready():
     now = datetime.now()
     tomorrow = datetime(now.year, now.month, now.day) + timedelta(hours=24)
     def is_a_workday(day):
-      return day.weekday() >= 0 and day.weekday() <= 4
+      return day.weekday() >= 0 and day.weekday() <= 4 and not day in us_holidays
 
     if is_a_workday(tomorrow) and not sent_today and now.hour == 18: # 6 PM
       sent_today = True
