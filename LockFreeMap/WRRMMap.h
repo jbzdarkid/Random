@@ -31,8 +31,8 @@ public:
 
     bool Lookup(const K& key, V& outValue) const {
         HazardPointer hazardPointer = LoadMap();
+        if (hazardPointer == nullptr) return false;
         Map* map = (Map*)hazardPointer;
-        if (map == nullptr) return false;
 
         auto search = map->find(key);
         if (search != map->end()) {
@@ -44,8 +44,8 @@ public:
 
     size_t Size() const {
         HazardPointer hazardPointer = LoadMap();
-        Map* map = (Map*)hazardPointer;
-        return (map != nullptr ? map->size() : 0);
+        if (hazardPointer == nullptr) return 0;
+        return (Map*)hazardPointer->size();
     }
 
     void Clear() {
