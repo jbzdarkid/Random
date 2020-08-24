@@ -1,5 +1,4 @@
 #include "HPRecType.h"
-#include "Util.h"
 #include <set>
 #include <vector>
 
@@ -37,18 +36,17 @@ void HazardPointer::Scan() {
 HazardPointer::HazardPointer() {
     // Try to reuse a retired node
     for (_node = s_head.load(); _node != nullptr; _node = _node->next) {
-        if (!CAS(_node->active, false, true)) continue;
+        bool expected = false;
+        if (!_node->active.compare_exchange_strong(expected, true)) continue;
         return;
     }
 
     // Else, there are no free nodes, create a new one
     _node = new HazardPointer::Node();
-    HazardPointer::Node* old;
+    HazardPointer::Node* old = s_head.load();
     do {
-        old = s_head.load();
         _node->next = old;
-    } while (!CAS(s_head, old, _node));
-    return;
+    } while (!s_head.compare_exchange_strong(old, _node));
 }
 
 HazardPointer::HazardPointer(HazardPointer&& other) noexcept {
