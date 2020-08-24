@@ -138,7 +138,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="Util.h" />
     <ClInclude Include="HPRecType.h" />
     <ClInclude Include="WRRMMap.h" />
   </ItemGroup>

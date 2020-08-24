@@ -18,9 +18,6 @@
     <ClInclude Include="HPRecType.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Util.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="WRRMMap.h">
       <Filter>Header Files</Filter>
     </ClInclude>

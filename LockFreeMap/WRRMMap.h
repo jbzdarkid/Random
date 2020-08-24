@@ -1,5 +1,4 @@
 #include "HPRecType.h"
-#include "Util.h"
 #include <atomic>
 #include <map>
 
@@ -13,12 +12,11 @@ public:
 
     void Update(const K& key, const V& value) {
         Map* newMap = nullptr;
-        Map* oldMap = nullptr;
+        void* oldMap = _map.load();
         do {
-            oldMap = (Map*)_map.load();
             if (newMap) delete newMap;
             if (oldMap) {
-                newMap = new Map(*oldMap);
+                newMap = new Map(*(Map*)oldMap);
             } else {
                 newMap = new Map();
             }
@@ -27,7 +25,7 @@ public:
             // with regards to the contents of the std::maps. All it can guarantee is that
             // the pointers are what expect -- which is why we have to cast the std::maps
             // down to void* before attemping the swap.
-        } while (!CAS(_map, (void*)oldMap, (void*)newMap));
+        } while (!_map.compare_exchange_strong(oldMap, (void*)newMap));
         HazardPointer::Retire(oldMap);
     }
 
@@ -48,6 +46,12 @@ public:
         HazardPointer hazardPointer = LoadMap();
         Map* map = (Map*)hazardPointer;
         return (map != nullptr ? map->size() : 0);
+    }
+
+    void Clear() {
+        void* oldMap = _map.load();
+        while (!_map.compare_exchange_strong(oldMap, (void*)nullptr));
+        HazardPointer::Retire(oldMap);
     }
 
 private:

@@ -45,4 +45,9 @@ int main() {
     }
     for (auto& thread : threads) thread.join();
     OutputDebugString(totalOutput.c_str());
+
+    map.Clear();
+    mapSize = std::to_wstring(map.Size()) + L'\n';
+    OutputDebugString(mapSize.c_str());
+
 }
