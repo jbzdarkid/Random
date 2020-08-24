@@ -19,7 +19,8 @@ int main() {
         }));
     }
     for (auto& thread : threads) thread.join();
-    cout << map.Size() << endl;
+    wstring mapSize = std::to_wstring(map.Size()) + L'\n';
+    OutputDebugString(mapSize.c_str());
 
     string totalOutput;
     mutex outputMutex;

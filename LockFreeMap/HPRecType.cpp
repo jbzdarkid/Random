@@ -5,14 +5,13 @@
 
 using namespace std;
 
-atomic<HazardPointer::HPRecType*> HazardPointer::pHead;
-atomic<int> HazardPointer::listLen;
+atomic<HazardPointer::Node*> HazardPointer::s_head;
 
-thread_local std::vector<void*> retiredList;
+thread_local std::vector<void*> _retiredList;
 
 void HazardPointer::Retire(void* pOld) {
-    retiredList.push_back(pOld);
-    if (retiredList.size() >= 100) { // Maximum retired list size
+    _retiredList.push_back(pOld);
+    if (_retiredList.size() >= 100) { // Maximum retired list size
         Scan();
     }
 }
@@ -20,17 +19,17 @@ void HazardPointer::Retire(void* pOld) {
 void HazardPointer::Scan() {
     // Stage 1: Scan the hazard pointers list, collecting all nonnull ptrs
     std::set<void*> hazardPointers;
-    for (HazardPointer::HPRecType* head = HazardPointer::pHead.load(); head != nullptr; head = head->pNext) {
-        if (head->pHazard) hazardPointers.insert(head->pHazard);
+    for (auto* node = s_head.load(); node != nullptr; node = node->next) {
+        if (node->ptr) hazardPointers.insert(node->ptr);
     }
 
     // Stage 2 (sort the list) isn't required when using std::set.
 
     // Stage 3: Search for them!
-    for (auto it = retiredList.begin(); it != retiredList.end(); ) {
+    for (auto it = _retiredList.begin(); it != _retiredList.end(); ) {
         if (hazardPointers.find(*it) != hazardPointers.end()) {
             delete *it;
-            it = retiredList.erase(it);
+            it = _retiredList.erase(it);
         } else {
             ++it;
         }
@@ -38,41 +37,33 @@ void HazardPointer::Scan() {
 }
 
 HazardPointer::HazardPointer() {
-    // Try to reuse a retired HP record
-    for (HazardPointer::HPRecType* p = pHead.load(); p != nullptr; p = p->pNext) {
-        if (!CAS(active, false, true)) continue;
-        hpRec = p;
+    // Try to reuse a retired node
+    for (_node = s_head.load(); _node != nullptr; _node = _node->next) {
+        if (!CAS(_node->active, false, true)) continue;
         return;
     }
 
-    // Else, increment the list length
-    int oldLen;
+    // Else, there are no free nodes, create a new one
+    _node = new HazardPointer::Node();
+    HazardPointer::Node* old = s_head.load();
     do {
-        oldLen = listLen.load();
-    } while (!CAS(listLen, oldLen, oldLen + 1));
-
-    // Allocate a new HPRec, and push it on the front
-    HazardPointer::HPRecType* p = new HazardPointer::HPRecType();
-    HazardPointer::HPRecType* old = pHead.load();
-    do {
-        p->pNext = old;
-    } while (!CAS(pHead, old, p));
-    hpRec = p;
+        _node->next = old;
+    } while (!CAS(s_head, old, _node));
     return;
 }
 
 HazardPointer::HazardPointer(HazardPointer&& other) noexcept {
-    std::exchange(hpRec, other.hpRec);
+    std::swap(_node, other._node);
 }
 
 HazardPointer::~HazardPointer() {
-    if (hpRec) {
-        hpRec->pHazard = nullptr;
-        active = false;
+    if (_node) {
+        _node->ptr = nullptr;
+        _node->active = false;
     }
 }
 
 HazardPointer& HazardPointer::operator=(HazardPointer&& other) noexcept {
-    std::exchange(hpRec, other.hpRec);
+    std::swap(_node, other._node);
     return other;
 }

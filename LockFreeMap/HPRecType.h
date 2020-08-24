@@ -15,31 +15,28 @@ public:
 
     template<typename T>
     operator T() {
-        return (T)hpRec->pHazard;
+        return (T)_node->ptr;
     }
 
     template<typename T>
     bool operator==(const T& other) const {
-        return (T)hpRec->pHazard == other;
+        return (T)_node->ptr == other;
     }
 
     void operator=(void* value) {
-        hpRec->pHazard = value;
+        _node->ptr = value;
     }
 
 private:
-    class HPRecType final {
-    public:
-        void* pHazard = nullptr;
-        HPRecType* pNext = nullptr;
-    };
-
     static void Scan();
-    static std::atomic<HPRecType*> pHead;
-    static std::atomic<int> listLen;
 
-    std::atomic<bool> active = true;
-    HPRecType* hpRec;
+    struct Node final {
+        void* ptr = nullptr;
+        std::atomic<bool> active = true;
+        Node* next = nullptr;
+    };
+    static std::atomic<Node*> s_head;
+    Node* _node;
 };
 
 template<typename T>
