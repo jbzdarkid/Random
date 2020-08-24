@@ -11,9 +11,7 @@ thread_local std::vector<void*> _retiredList;
 
 void HazardPointer::Retire(void* pOld) {
     _retiredList.push_back(pOld);
-    if (_retiredList.size() >= 100) { // Maximum retired list size
-        Scan();
-    }
+    Scan();
 }
 
 void HazardPointer::Scan() {
