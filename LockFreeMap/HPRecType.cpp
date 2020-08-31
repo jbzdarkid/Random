@@ -50,7 +50,8 @@ HazardPointer::HazardPointer() {
 }
 
 HazardPointer::HazardPointer(HazardPointer&& other) noexcept {
-    std::swap(_node, other._node);
+    _node = other._node;
+    other._node = nullptr;
 }
 
 HazardPointer::~HazardPointer() {
@@ -61,6 +62,7 @@ HazardPointer::~HazardPointer() {
 }
 
 HazardPointer& HazardPointer::operator=(HazardPointer&& other) noexcept {
-    std::swap(_node, other._node);
+    _node = other._node;
+    other._node = nullptr;
     return other;
 }
