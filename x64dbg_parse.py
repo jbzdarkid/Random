@@ -1,19 +1,42 @@
 from pathlib import Path
 import re
+import sys
+
+# https://en.wikipedia.org/wiki/X86_calling_conventions#List_of_x86_calling_conventions
+CALLING_CONVENTION = 'x86 fastcall'
 
 def strip(str):
+  str = str.strip()
+
+  is_byte = ('byte ptr' in str)
   m = re.search('\[.*?\]', str)
   if m:
-    return m.group(0)
-  else:
-    return str
+    str = m.group(0)
+  if is_byte:
+    str = f'(byte){str}'
+
+  m = re.search('\[esp ?\+ ?(.+)\]', str)
+  if m:
+    stack_offset = int(m.group(1), 16)
+    if stack_offset % 4 != 0:
+      return str # Uneven stack offset, unsure how to handle
+
+    stack_offset = stack_offset // 4
+    if stack_offset > len(stack):
+      replace = f'arg_{stack_offset - len(stack)}'
+    else:
+      replace = stack[stack_offset]
+    str = str[:m.start(0)] + replace + str[m.end(0):]
+  return str
 
 p = Path('raw.txt')
 jumps = []
 lines = {}
 stack = []
-
+function_stack = [] # TODO
+function_addr = None
 last_cmp = None
+
 for line in p.open('r'):
   if line.count('|') != 3:
     continue
@@ -25,6 +48,9 @@ for line in p.open('r'):
   for i in range(0, len(bytes), 2):
     hex.append(int(bytes[i:i+2], 16))
 
+  if not function_addr:
+    function_addr = addr
+
   inst, asm = orig_asm.split(' ', 1)
   asm = asm.lstrip()
   if inst == 'jmp':
@@ -34,10 +60,12 @@ for line in p.open('r'):
   elif inst in ['je', 'jne', 'jae', 'jle', 'jbe', 'jnz']:
     asm = asm.split('.')[-1]
     jumps.append(asm)
+    assert(last_cmp)
     if inst not in last_cmp:
       asm = inst + '\t' + asm
     else:
       asm = f'if ({last_cmp[inst]}) goto {asm}'
+    last_cmp = None # @Assume compilers do not make multiple jumps with the same flags
   elif inst in ['sar', 'shl', 'sal']:
     reg, amt = asm.split(',')
     amt = int(amt, 16)
@@ -50,7 +78,7 @@ for line in p.open('r'):
   elif inst == 'shr':
     reg, amt = asm.split(',')
     asm = f'{reg} = {reg} >> {int(amt, 16)} // Note: does not preserve sign'
-  elif inst[:3] == 'mov': # TODO: Might want to warn about single byte moves
+  elif inst[:3] == 'mov':
     dst, src = asm.split(',')
     asm = f'{strip(dst)} = {strip(src)}'
   elif inst == 'lea':
@@ -105,13 +133,13 @@ for line in p.open('r'):
         'je': f'{dst} == 0',
         'jne': f'{dst} != 0',
       }
-      continue
+      asm = ''
     else:
       last_cmp = {
         'je': f'{dst} == {src}',
         'jne': f'{dst} != {src}',
       }
-      continue
+      asm = ''
   elif inst == 'cmp':
     dst, src = asm.split(',')
     last_cmp = {
@@ -126,25 +154,38 @@ for line in p.open('r'):
       'ja': f'{dst} > {src}',
       'jae': f'{dst} >= {src}',
     }
-    continue
+    asm = ''
   elif inst == 'nop':
-    continue
+    asm = ''
   elif inst == 'ret':
-    amt = int(asm, 16)
+    # amt = int(asm, 16) # @Assume the compiler knows what it's doing
+    amt = 0
     asm = 'pop\n' * (amt // 4) + 'return'
   elif inst == 'push':
     stack.append(asm)
-    continue
+    # TODO: Sometimes, we do this instead. When?
+    function_stack.append(asm)
+    asm = ''
   elif inst == 'pop':
     stack.pop()
-    continue
+    asm = ''
+  elif inst == 'call':
+    asm = asm.split('.')[-1]
+    if CALLING_CONVENTION == 'x86 fastcall':
+      args = 'edx, ecx, ' + ', '.join(reversed(function_stack))
+    asm = f'func_{asm}({args})'
   else:
     asm = inst + '\t' + asm
 
-  lines[addr] = asm
-  # lines[addr] = asm + '\t\t\t\t' + orig_asm
+  if '--debug' in sys.argv:
+    asm += ' ' * (60 - len(asm)) + orig_asm
+  if asm:
+    lines[addr] = asm
 
-for addr in sorted(lines.keys()):
+addrs = sorted(lines.keys())
+print(f'void func_{function_addr}() {{')
+for addr in addrs:
   if addr in jumps:
     print(f'label {addr}:')
-  print(lines[addr])
+  print(f'  {lines[addr]}')
+print('}')
