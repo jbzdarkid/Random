@@ -109,7 +109,7 @@ for line in p.open('r'):
     asm = f'goto {asm}'
     # Code which follows an unconditional jump should not be interpreted, until we reach an instruction which can be jumped to.
     unreachable_code = True
-  elif inst in ['je', 'jne', 'ja', 'jae', 'jle', 'jb', 'jbe', 'jnz']:
+  elif inst in ['je', 'jne', 'jl', 'jle', 'jb', 'jbe', 'jg', 'jge', 'ja', 'jae']:
     asm = int(asm.split('.')[-1], 16)
     jumps.add(asm)
     assert(last_cmp)
@@ -213,9 +213,11 @@ for line in p.open('r'):
     })
   elif inst == 'nop':
     asm = ''
+  elf inst == 'leave':
+    asm = ''
   elif inst == 'ret':
     # TODO: Somehow restore the stack... As a workaround, I'm not popping registers from the stack!
-    amt = int(asm, 16) if asm else 0
+    # amt = int(asm, 16) if asm else 0
     amt = 0 # @Assume the compiler knows what it's doing
     asm = 'pop\n' * (amt // 4) + 'return'
   elif inst == 'push':
@@ -258,12 +260,15 @@ for line in p.open('r'):
 
 first_addr = lines[0][0]
 
-jumps = jumps.union(data_jumps)
+jumps = sorted(jumps.union(data_jumps))
 print(f'void func_{first_addr}() {{')
 for addr, asm in lines:
   if addr in jumps:
     print(f'label {to_hex_str(addr)}:')
     jumps.remove(addr)
+  if addr > jumps[0]:
+    print(f'label {to_hex_str(addr)}: // Note {to_hex_str(jumps[0])} occurred in the middle of the previous line')
+    jumps.pop(0)
   if asm:
     if '--debug' in sys.argv:
       print(f'{to_hex_str(addr)}: {asm}')
