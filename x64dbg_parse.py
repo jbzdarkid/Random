@@ -22,10 +22,15 @@ def strip(str):
       return str # Uneven stack offset, unsure how to handle
 
     stack_offset = stack_offset // 4
-    if stack_offset > len(stack):
-      replace = f'arg_{stack_offset - len(stack)}'
+    if stack_offset < len(function_stack):
+      replace = function_stack[stack_offset]
     else:
-      replace = stack[stack_offset]
+      stack_offset -= len(function_stack)
+      if stack_offset < len(stack):
+        replace = stack[stack_offset]
+      else:
+        stack_offset -= len(stack)
+        replace = f'arg_{stack_offset}'
     str = str[:m.start(0)] + replace + str[m.end(0):]
   return str
 
@@ -33,8 +38,9 @@ p = Path('raw.txt')
 jumps = []
 lines = {}
 stack = []
-function_stack = [] # TODO
+function_stack = []
 function_addr = None
+is_function_stack = False
 last_cmp = None
 
 for line in p.open('r'):
@@ -51,21 +57,27 @@ for line in p.open('r'):
   if not function_addr:
     function_addr = addr
 
-  inst, asm = orig_asm.split(' ', 1)
+  if orig_asm.count(' ') > 0:
+    inst, asm = orig_asm.split(' ', 1)
+  else:
+    inst = orig_asm
+    asm = ''
   asm = asm.lstrip()
   if inst == 'jmp':
     asm = asm.split('.')[-1]
     jumps.append(asm)
     asm = f'goto {asm}'
-  elif inst in ['je', 'jne', 'jae', 'jle', 'jbe', 'jnz']:
+  elif inst in ['je', 'jne', 'ja', 'jae', 'jle', 'jb', 'jbe', 'jnz']:
     asm = asm.split('.')[-1]
     jumps.append(asm)
     assert(last_cmp)
     if inst not in last_cmp:
       asm = inst + '\t' + asm
+      print(inst, last_cmp.keys())
     else:
       asm = f'if ({last_cmp[inst]}) goto {asm}'
     last_cmp = None # @Assume compilers do not make multiple jumps with the same flags
+    is_function_stack = True
   elif inst in ['sar', 'shl', 'sal']:
     reg, amt = asm.split(',')
     amt = int(amt, 16)
@@ -83,19 +95,12 @@ for line in p.open('r'):
     asm = f'{strip(dst)} = {strip(src)}'
   elif inst == 'lea':
     dst, src = asm.split(',')
-    asm = f'{dst} = {strip(src)[1:-1]}'
-  elif inst == 'add':
-    reg, amt = asm.split(',')
-    asm = f'{reg} = {strip(reg)} + {strip(amt)}'
-  elif inst == 'sub':
-    dst, src = asm.split(',')
-    dst = strip(dst)
     src = strip(src)
-    asm = f'{dst} = {dst} - {src}'
-    last_cmp = {
-      'js': f'{dst} < {src}',
-      'jns': f'{dst} >= {src}',
-    }
+    if src[0] == '[' and src[-1] == ']':
+      src = src[1:-1]
+    else:
+      src = '&' + src
+    asm = f'{dst} = {src}'
   elif inst == 'imul':
     if asm.count(',') == 0:
       multiplier = asm
@@ -126,25 +131,29 @@ for line in p.open('r'):
     asm = f'{asm}++'
   elif inst == 'dec':
     asm = f'{asm}--'
-  elif inst == 'test':
+  elif inst in ['test', 'cmp', 'sub', 'add']:
     dst, src = asm.split(',')
-    if dst == src:
+    dst = strip(dst)
+    src = strip(src)
+    asm = ''
+
+    last_cmp = {}
+    if inst == 'test' and dst == src:
+      src = 0
+    if inst in ['sub', 'add']:
+      if inst == 'sub':
+        asm = f'{dst} = {dst} - {src}'
+      elif inst == 'add':
+        asm = f'{dst} = {dst} - {src}'
+      src = 0
       last_cmp = {
-        'je': f'{dst} == 0',
-        'jne': f'{dst} != 0',
+        'js': f'{dst} < {src}',
+        'jns': f'{dst} >= {src}',
       }
-      asm = ''
-    else:
-      last_cmp = {
-        'je': f'{dst} == {src}',
-        'jne': f'{dst} != {src}',
-      }
-      asm = ''
-  elif inst == 'cmp':
-    dst, src = asm.split(',')
-    last_cmp = {
+
+    last_cmp.update({
       'je': f'{dst} == {src}',
-      'jne': f'{dst} == {src}',
+      'jne': f'{dst} != {src}',
       'jl': f'{dst} < {src}',
       'jle': f'{dst} <= {src}',
       'jb': f'{dst} < {src}',
@@ -153,39 +162,57 @@ for line in p.open('r'):
       'jge': f'{dst} >= {src}',
       'ja': f'{dst} > {src}',
       'jae': f'{dst} >= {src}',
-    }
-    asm = ''
+    })
   elif inst == 'nop':
     asm = ''
   elif inst == 'ret':
-    # amt = int(asm, 16) # @Assume the compiler knows what it's doing
-    amt = 0
+    # TODO: Somehow restore the stack... As a workaround, I'm not popping registers from the stack!
+    amt = int(asm, 16) if asm else 0
+    amt = 0 # @Assume the compiler knows what it's doing
     asm = 'pop\n' * (amt // 4) + 'return'
   elif inst == 'push':
-    stack.append(asm)
-    # TODO: Sometimes, we do this instead. When?
-    function_stack.append(asm)
+    if hex[0] == 0x6A:
+      asm = '(byte)0x' + str(int(asm, 16)).zfill(2)
+    if is_function_stack:
+      function_stack.append(asm) # Technically this should be 'current value of' not just the register
+    else:
+      stack.append(asm)
     asm = ''
   elif inst == 'pop':
-    stack.pop()
+    if len(function_stack) > 0:
+      function_stack.pop()
+    else:
+      pass
+      # stack.pop()
     asm = ''
   elif inst == 'call':
     asm = asm.split('.')[-1]
     if CALLING_CONVENTION == 'x86 fastcall':
-      args = 'edx, ecx, ' + ', '.join(reversed(function_stack))
+      args = 'ecx, edx, ' + ', '.join(reversed(function_stack))
     asm = f'func_{asm}({args})'
+    if CALLING_CONVENTION in ['x86 fastcall']:
+      function_stack = []
+    else:
+      pass # TODO: Non-callee saved conventions don't work like this.
+  elif inst == 'rep':
+    if asm == 'movsd':
+      asm = '[edi] = [esi]\n  edi = edi + 4\n  esi = esi + 4'
+    elif hex[1] == 0x48: # @Guess
+      asm = '[rdi] = [rsi]\n  rdi = rdi + 8\n  rsi = rsi + 8'
+
   else:
     asm = inst + '\t' + asm
 
   if '--debug' in sys.argv:
     asm += ' ' * (60 - len(asm)) + orig_asm
-  if asm:
-    lines[addr] = asm
+    print(stack, orig_asm)
+  lines[addr] = asm
 
 addrs = sorted(lines.keys())
 print(f'void func_{function_addr}() {{')
 for addr in addrs:
   if addr in jumps:
     print(f'label {addr}:')
-  print(f'  {lines[addr]}')
+  if lines[addr]:
+    print(f'  {lines[addr]}')
 print('}')
