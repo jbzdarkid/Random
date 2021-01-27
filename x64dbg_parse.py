@@ -4,6 +4,7 @@ import sys
 
 # https://en.wikipedia.org/wiki/X86_calling_conventions#List_of_x86_calling_conventions
 CALLING_CONVENTION = 'x86 fastcall'
+ENDINNESS = 'little'
 
 def strip(str):
   str = str.strip()
@@ -34,29 +35,61 @@ def strip(str):
     str = str[:m.start(0)] + replace + str[m.end(0):]
   return str
 
+def to_hex_str(num, len=8):
+  import builtins
+  assert(ENDINNESS == 'little')
+  return '0x' + builtins.hex(num)[2:].upper().zfill(len)
+
 p = Path('raw.txt')
-jumps = []
-lines = {}
+jumps = set()
+data_jumps = set()
+lines = []
 stack = []
 function_stack = []
-function_addr = None
 is_function_stack = False
 last_cmp = None
+unreachable_code = False
+code_is_data = False
+data_bytes = []
 
 for line in p.open('r'):
   if line.count('|') != 3:
     continue
-  addr, bytes, asm, comment = line.split('|')
-  addr = addr.lstrip('0').strip()
-  orig_asm = asm.strip()
+  addr, bytes, orig_asm, comment = line.split('|')
+  addr = int(addr, 16)
   bytes = bytes.strip().replace(':', '').replace(' ', '')
   hex = []
   for i in range(0, len(bytes), 2):
     hex.append(int(bytes[i:i+2], 16))
 
-  if not function_addr:
-    function_addr = addr
+  if unreachable_code or code_is_data:
+    if addr in jumps:
+      unreachable_code = False
+      code_is_data = False
+    elif addr in data_jumps or addr-4 in data_jumps: # Slight hack, but it seems like some arrays start at 1 (!)
+      unreachable_code = False
+      code_is_data = True
 
+  if code_is_data or unreachable_code:
+    needs_reassembly = False
+    for byte in hex:
+      if code_is_data:
+        data_bytes.append(byte)
+        if len(data_bytes) == 4:
+          int_val = int.from_bytes(data_bytes, byteorder=ENDINNESS)
+          jumps.add(int_val)
+          lines.append((addr-4, f'// {to_hex_str(int_val)}'))
+          data_bytes = []
+      if addr in jumps:
+        needs_reassembly = True
+        break
+      addr += 1
+    if needs_reassembly:
+      lines.append((addr, f'// Please re-assemble the code from address {to_hex_str(addr)}'))
+      break
+    continue
+
+  orig_asm = orig_asm.strip()
   if orig_asm.count(' ') > 0:
     inst, asm = orig_asm.split(' ', 1)
   else:
@@ -65,17 +98,26 @@ for line in p.open('r'):
   asm = asm.lstrip()
   if inst == 'jmp':
     asm = asm.split('.')[-1]
-    jumps.append(asm)
+    try:
+      asm = int(asm, 16)
+      jumps.add(asm)
+      asm = to_hex_str(asm)
+    except ValueError:
+      m = re.search('0x([\dA-F]+)', asm)
+      if m:
+        data_jumps.add(int(m.group(1), 16))
     asm = f'goto {asm}'
+    # Code which follows an unconditional jump should not be interpreted, until we reach an instruction which can be jumped to.
+    unreachable_code = True
   elif inst in ['je', 'jne', 'ja', 'jae', 'jle', 'jb', 'jbe', 'jnz']:
-    asm = asm.split('.')[-1]
-    jumps.append(asm)
+    asm = int(asm.split('.')[-1], 16)
+    jumps.add(asm)
     assert(last_cmp)
     if inst not in last_cmp:
       asm = inst + '\t' + asm
       print(inst, last_cmp.keys())
     else:
-      asm = f'if ({last_cmp[inst]}) goto {asm}'
+      asm = f'if ({last_cmp[inst]}) goto {to_hex_str(asm)}'
     last_cmp = None # @Assume compilers do not make multiple jumps with the same flags
     is_function_stack = True
   elif inst in ['sar', 'shl', 'sal']:
@@ -131,7 +173,7 @@ for line in p.open('r'):
     asm = f'{asm}++'
   elif inst == 'dec':
     asm = f'{asm}--'
-  elif inst in ['test', 'cmp', 'sub', 'add']:
+  elif inst in ['test', 'cmp', 'sub', 'add', 'and']:
     dst, src = asm.split(',')
     dst = strip(dst)
     src = strip(src)
@@ -140,11 +182,17 @@ for line in p.open('r'):
     last_cmp = {}
     if inst == 'test' and dst == src:
       src = 0
-    if inst in ['sub', 'add']:
+    if inst in ['sub', 'add', 'and']:
       if inst == 'sub':
         asm = f'{dst} = {dst} - {src}'
       elif inst == 'add':
         asm = f'{dst} = {dst} - {src}'
+      elif inst == 'and':
+        try:
+          src = to_hex_str(int(src, 16))
+        except ValueError:
+          pass # Register, not immediate
+        asm = f'{dst} = {dst} & {src}'
       src = 0
       last_cmp = {
         'js': f'{dst} < {src}',
@@ -206,13 +254,24 @@ for line in p.open('r'):
   if '--debug' in sys.argv:
     asm += ' ' * (60 - len(asm)) + orig_asm
     print(stack, orig_asm)
-  lines[addr] = asm
+  lines.append((addr, asm))
 
-addrs = sorted(lines.keys())
-print(f'void func_{function_addr}() {{')
-for addr in addrs:
+first_addr = lines[0][0]
+
+jumps = jumps.union(data_jumps)
+print(f'void func_{first_addr}() {{')
+for addr, asm in lines:
   if addr in jumps:
-    print(f'label {addr}:')
-  if lines[addr]:
-    print(f'  {lines[addr]}')
+    print(f'label {to_hex_str(addr)}:')
+    jumps.remove(addr)
+  if asm:
+    if '--debug' in sys.argv:
+      print(f'{to_hex_str(addr)}: {asm}')
+    else:
+      print(f'  {asm}')
 print('}')
+
+if len(jumps) > 0:
+  print(f'WARNING: {len(jumps)} jumps were not matched in the assembly! Please disassemble a larger region.')
+  print(f'Region: {to_hex_str(first_addr)}-{to_hex_str(lines[-1][0])}')
+  print('[' + ', '.join(map(to_hex_str, sorted(jumps))) + ']')
