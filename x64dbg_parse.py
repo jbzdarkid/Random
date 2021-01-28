@@ -2,6 +2,20 @@ from pathlib import Path
 import re
 import sys
 
+# TODO: Consider switching to capstone
+"""
+import capstone
+
+CODE = b"\x55\x48\x8b\x05\xb8\x13\x00\x00"
+
+md = capstone.Cs(CS_ARCH_X86, CS_MODE_64)
+for i in md.disasm(CODE, 0x1000): // 0x1000 == start point
+  print("0x%x:\t%s\t%s" %(i.address, i.mnemonic, i.op_str))
+  # i.address = 0x1000 (= addr)
+  # i.mnemonic = "mov rax, ..." (= orig_asm)
+  # i.bytes = 0x01, 0x02, 0x03 (= hex)
+"""
+
 # https://en.wikipedia.org/wiki/X86_calling_conventions#List_of_x86_calling_conventions
 CALLING_CONVENTION = 'x86 fastcall'
 ENDINNESS = 'little'
@@ -51,6 +65,7 @@ last_cmp = None
 unreachable_code = False
 code_is_data = False
 data_bytes = []
+df_flag = '+'
 
 for line in p.open('r'):
   if line.count('|') != 3:
@@ -66,7 +81,8 @@ for line in p.open('r'):
     if addr in jumps:
       unreachable_code = False
       code_is_data = False
-    elif addr in data_jumps or addr-4 in data_jumps: # Slight hack, but it seems like some arrays start at 1 (!)
+    elif addr in data_jumps or addr-4 in data_jumps:
+      # Slight hack, but it seems like some data arrays start at 1 (!)
       unreachable_code = False
       code_is_data = True
 
@@ -78,7 +94,7 @@ for line in p.open('r'):
         if len(data_bytes) == 4:
           int_val = int.from_bytes(data_bytes, byteorder=ENDINNESS)
           jumps.add(int_val)
-          lines.append((addr-4, f'// {to_hex_str(int_val)}'))
+          lines.append((addr-3, f'// {to_hex_str(addr-3)}: {to_hex_str(int_val)}'))
           data_bytes = []
       if addr in jumps:
         needs_reassembly = True
@@ -173,7 +189,9 @@ for line in p.open('r'):
     asm = f'{asm}++'
   elif inst == 'dec':
     asm = f'{asm}--'
-  elif inst in ['test', 'cmp', 'sub', 'add', 'and']:
+  elif inst == 'neg':
+    asm = f'{asm} = ~{asm}'
+  elif inst in ['test', 'cmp', 'sub', 'add', 'and', 'or']:
     dst, src = asm.split(',')
     dst = strip(dst)
     src = strip(src)
@@ -182,17 +200,18 @@ for line in p.open('r'):
     last_cmp = {}
     if inst == 'test' and dst == src:
       src = 0
-    if inst in ['sub', 'add', 'and']:
-      if inst == 'sub':
-        asm = f'{dst} = {dst} - {src}'
-      elif inst == 'add':
-        asm = f'{dst} = {dst} - {src}'
-      elif inst == 'and':
+    if inst in ['sub', 'add', 'and', 'or']:
+      op = {'sub': '-', 'add': '+', 'and': '&', 'or': '|'}[inst]
+      if inst in ['and', 'or']:
         try:
           src = to_hex_str(int(src, 16))
         except ValueError:
           pass # Register, not immediate
-        asm = f'{dst} = {dst} & {src}'
+      if inst == 'or' and src == '0xFFFFFFFF':
+        # Special case because this is a common, efficient way of setting a register to -1.
+        asm = f'{dst} = -1'
+      else:
+        asm = f'{dst} = {dst} {op} {src}'
       src = 0
       last_cmp = {
         'js': f'{dst} < {src}',
@@ -213,13 +232,14 @@ for line in p.open('r'):
     })
   elif inst == 'nop':
     asm = ''
-  elf inst == 'leave':
+  elif inst == 'leave':
     asm = ''
   elif inst == 'ret':
     # TODO: Somehow restore the stack... As a workaround, I'm not popping registers from the stack!
     # amt = int(asm, 16) if asm else 0
     amt = 0 # @Assume the compiler knows what it's doing
     asm = 'pop\n' * (amt // 4) + 'return'
+    unreachable_code = True
   elif inst == 'push':
     if hex[0] == 0x6A:
       asm = '(byte)0x' + str(int(asm, 16)).zfill(2)
@@ -244,24 +264,30 @@ for line in p.open('r'):
       function_stack = []
     else:
       pass # TODO: Non-callee saved conventions don't work like this.
-  elif inst == 'rep':
+  elif inst == 'rep': # These might be wrong. Not sure.
     if asm == 'movsd':
-      asm = '[edi] = [esi]\n  edi = edi + 4\n  esi = esi + 4'
+      asm = f'[edi] = [esi]\n  edi = edi {df_flag} 4\n  esi = esi {df_flag} 4'
     elif hex[1] == 0x48: # @Guess
-      asm = '[rdi] = [rsi]\n  rdi = rdi + 8\n  rsi = rsi + 8'
+      asm = f'[rdi] = [rsi]\n  rdi = rdi {df_flag} 8\n  rsi = rsi {df_flag} 8'
+  elif inst == 'cld':
+    df_flag = '+'
+    asm = ''
+  elif inst == 'std':
+    df_flag = '-' # Reverses the direction of 'rep' instructions
+    asm = ''
 
   else:
+    print(f'Missing instruction: {inst}')
     asm = inst + '\t' + asm
 
   if '--debug' in sys.argv:
     asm += ' ' * (60 - len(asm)) + orig_asm
-    print(stack, orig_asm)
   lines.append((addr, asm))
 
 first_addr = lines[0][0]
 
 jumps = sorted(jumps.union(data_jumps))
-print(f'void func_{first_addr}() {{')
+print(f'void func_{to_hex_str(first_addr)}() {{')
 for addr, asm in lines:
   if addr in jumps:
     print(f'label {to_hex_str(addr)}:')
