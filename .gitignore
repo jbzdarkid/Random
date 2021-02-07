@@ -16,3 +16,5 @@ Bandcamp/Cover.jpg
 tmp
 *.tlog
 *.ilk
+*.suo
+*/Assembly-CSharp/*
