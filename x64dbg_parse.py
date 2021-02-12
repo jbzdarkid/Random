@@ -3,22 +3,9 @@ import re
 import sys
 from textwrap import dedent
 
-# TODO: Consider switching to capstone
-"""
-import capstone
-
-CODE = b"\x55\x48\x8b\x05\xb8\x13\x00\x00"
-
-md = capstone.Cs(CS_ARCH_X86, CS_MODE_64)
-for i in md.disasm(CODE, 0x1000): // 0x1000 == start point
-  print("0x%x:\t%s\t%s" %(i.address, i.mnemonic, i.op_str))
-  # i.address = 0x1000 (= addr)
-  # i.mnemonic = "mov rax, ..." (= orig_asm)
-  # i.bytes = 0x01, 0x02, 0x03 (= hex)
-"""
-
 # https://en.wikipedia.org/wiki/X86_calling_conventions#List_of_x86_calling_conventions
-CALLING_CONVENTION = 'x86 fastcall'
+# CALLING_CONVENTION = 'x86 fastcall'
+CALLING_CONVENTION = 'x86 thiscall'
 ENDINNESS = 'little'
 
 # TODO: Extend this table for x64. Or just replace it, since we need to use rax, etc.
@@ -52,6 +39,10 @@ register_replacements_x64 = {
   'r8d':  '(int)r8',
 }
 
+def split(asm):
+  dst, src = asm.split(',')
+  return strip(dst), strip(src)
+
 def strip(str):
   str = str.strip()
 
@@ -83,9 +74,24 @@ def strip(str):
   str = register_replacements_x86.get(str, str) # Replace if found, unchanged if not.
   return str
 
+reg_values = {
+  'eax': 'orig_eax',
+  'ebx': 'orig_ebx',
+  'ecx': 'orig_ecx',
+  'edx': 'orig_edx',
+  'esi': 'orig_esi',
+  'ebp': 'orig_ebp',
+}
+def assign(dst, src):
+  for key in reg_values:
+    if key in dst:
+      reg_values[key] = src
+  return f'{dst} = {src}'
+
 def to_hex_str(num, len=8):
   import builtins
   assert(ENDINNESS == 'little')
+  # TODO: return '0x' + builtins.hex(num)[2:].upper()
   return '0x' + builtins.hex(num)[2:].upper().zfill(len)
 
 exe = r'C:\Program Files (x86)\Steam\steamapps\common\Dark Souls Prepare to Die Edition\DATA\DARKSOULS.exe'
@@ -132,6 +138,7 @@ data_jumps = set()
 lines = []
 stack = []
 function_stack = []
+fpu_stack = ['st(0)']
 is_function_stack = False
 last_cmp = None
 unreachable_code = False
@@ -148,34 +155,6 @@ for line in p.open('r'):
   hex = []
   for i in range(0, len(bytes), 2):
     hex.append(int(bytes[i:i+2], 16))
-
-  if unreachable_code or code_is_data:
-    if addr in jumps:
-      unreachable_code = False
-      code_is_data = False
-    elif addr in data_jumps or addr-4 in data_jumps:
-      # Slight hack, but it seems like some data arrays start at 1 (!)
-      unreachable_code = False
-      code_is_data = True
-
-  if code_is_data or unreachable_code:
-    needs_reassembly = False
-    for byte in hex:
-      if code_is_data:
-        data_bytes.append(byte)
-        if len(data_bytes) == 4:
-          int_val = int.from_bytes(data_bytes, byteorder=ENDINNESS)
-          jumps.add(int_val)
-          lines.append((addr-3, f'// {to_hex_str(addr-3)}: {to_hex_str(int_val)}'))
-          data_bytes = []
-      if addr in jumps:
-        needs_reassembly = True
-        break
-      addr += 1
-    if needs_reassembly:
-      lines.append((addr, f'// Please re-assemble the code from address {to_hex_str(addr)}'))
-      break
-    continue
 
   orig_asm = orig_asm.strip()
   if orig_asm.count(' ') > 0:
@@ -203,25 +182,25 @@ for line in p.open('r'):
 
     # Code which follows an unconditional jump should not be interpreted, until we reach an instruction which can be jumped to.
     unreachable_code = True
-  elif inst in ['je', 'jne', 'jl', 'jle', 'jb', 'jbe', 'jg', 'jge', 'ja', 'jae']:
+  elif inst in ['je', 'jne', 'jl', 'jle', 'jb', 'jbe', 'jg', 'jge', 'ja', 'jae', 'jp', 'jnp']:
     asm = int(asm.split('.')[-1], 16)
     jumps.add(asm)
     assert(last_cmp)
     if inst not in last_cmp:
-      asm = inst + '\t' + asm
-      print(inst, last_cmp.keys())
+      asm = f'{inst}\t{asm}'
+      print(f'Don\'t know how to execute jump {inst}')
     else:
       asm = f'if ({last_cmp[inst]}) goto {to_hex_str(asm)}'
     last_cmp = None # @Assume compilers do not make multiple jumps with the same flags
     is_function_stack = True
   elif inst in ['setne']:
     assert(last_cmp)
-    inst = {'setne':'jne'}[inst]
+    inst = {'setne': 'jne'}[inst]
     if inst not in last_cmp:
       asm = inst + '\t' + asm
-      print(inst, last_cmp.keys())
+      print(f'Don\'t know how to execute jump {inst}')
     else:
-      asm = f'if ({last_cmp[inst]}) {asm} = 0x01'
+      asm = f'if ({last_cmp[inst]}) ' + assign(asm, 0x01)
   elif inst in ['sar', 'shl', 'sal']:
     reg, amt = asm.split(',')
     try:
@@ -233,15 +212,13 @@ for line in p.open('r'):
     except ValueError:
       pass
     operand = {'sar': '/', 'shl': '*', 'sal': '*'}[inst]
-    asm = f'{reg} = {reg} {operand} {amt}'
+    asm = assign(reg, f'{reg} {operand} {amt}')
   elif inst == 'shr':
     reg, amt = asm.split(',')
-    asm = f'{reg} = {reg} >> {int(amt, 16)} // Note: does not preserve sign'
+    asm = assign(reg, f'{reg} >> {int(amt, 16)}') + ' // Note: does not preserve sign'
   elif inst[:3] == 'mov':
-    dst, src = asm.split(',')
-    dst = strip(dst)
-    src = strip(src)
-    asm = f'{dst} = {src}'
+    dst, src = split(asm)
+    asm = assign(dst, src)
     try:
       amt = int(src, 16)
       if amt > 0x0100000: # Large number, may indicate multiplication offset. TODO: Just look for a subsequent mul/imul?
@@ -249,13 +226,12 @@ for line in p.open('r'):
     except ValueError:
       pass
   elif inst == 'lea':
-    dst, src = asm.split(',')
-    src = strip(src)
+    dst, src = split(asm)
     if src[0] == '[' and src[-1] == ']':
       src = src[1:-1]
     else:
       src = '&' + src
-    asm = f'{dst} = {src}'
+    asm = assign(dst, src)
   elif inst in ['imul', 'mul']: # TODO: imul is for signed integers. I should probably care about that.
     if asm.count(',') == 0:
       multiplier = asm
@@ -273,21 +249,21 @@ for line in p.open('r'):
         product = 'rdx:rax'
       else:
         assert(False)
-      asm = f'{product} = {multiplicand} * {multiplier}'
+      asm = assign(product, f'{multiplicand} * {multiplier}')
       if inst == 'mul':
         asm += ' // Note: Unsigned multiplication'
     else:
       asm = isnt + '\t' + asm
   elif inst == 'inc':
+    assign(asm, f'{asm} + 1')
     asm = f'{asm}++'
   elif inst == 'dec':
+    assign(asm, f'{asm} - 1')
     asm = f'{asm}--'
   elif inst == 'neg':
-    asm = f'{asm} = ~{asm}'
+    asm = assign(asm, f'~{asm}')
   elif inst in ['test', 'cmp', 'sub', 'add', 'and', 'or', 'xor']:
-    dst, src = asm.split(',')
-    dst = strip(dst)
-    src = strip(src)
+    dst, src = split(asm)
     asm = ''
 
     last_cmp = {}
@@ -297,13 +273,17 @@ for line in p.open('r'):
       op = {'sub': '-', 'add': '+', 'and': '&', 'or': '|', 'xor': '^'}[inst]
       if inst in ['and', 'or']:
         try:
-          src = to_hex_str(int(src, 16))
+          amt = int(src, 16)
+          if amt >= 0x80000000: # High bit is set, use 2's complement instead
+            src = f'~{to_hex_str(0xFFFFFFFF - amt)}'
+          else:
+            src = to_hex_str(amt)
         except ValueError:
           pass # Register, not immediate
       if inst == 'xor' and dst == src:
-        asm = f'{dst} = 0'
+        asm = assign(dst, '0')
       elif inst == 'or' and src == '0xFFFFFFFF':
-        asm = f'{dst} = -1'
+        asm = assign(dst, '-1')
       elif dst == 'esp':
         amt = int(src, 16)
         asm = ''
@@ -315,7 +295,7 @@ for line in p.open('r'):
             pass
             # stack.pop()
       else:
-        asm = f'{dst} = {dst} {op} {src}'
+        asm = assign(dst, f'{dst} {op} {src}')
       src = 0
       last_cmp.update({
         'js': f'{dst} < {src}',
@@ -330,7 +310,6 @@ for line in p.open('r'):
     # (short)(x + A) < B  is equivalent to
     # (x < B - A) || (x >= 0x10000 - A && x < B + 0x10000 - A)
 
-
     last_cmp.update({
       'je': f'{dst} == {src}',
       'jne': f'{dst} != {src}',
@@ -342,7 +321,6 @@ for line in p.open('r'):
       'jge': f'{dst} >= {src}',
       'ja': f'{dst} > {src}',
       'jae': f'{dst} >= {src}',
-      'regs': (dst, src),
     })
   elif inst == 'nop':
     asm = ''
@@ -355,10 +333,12 @@ for line in p.open('r'):
     asm = 'pop\n' * (amt // 4) + 'return'
     unreachable_code = True
   elif inst == 'push':
-    if hex[0] == 0x6A:
-      asm = '(byte)0x' + str(int(asm, 16)).zfill(2)
+    if hex[0] in [0x6A, 0x68]:
+      asm = to_hex_str(int(asm, 16))
+    elif asm in reg_values:
+      asm = reg_values[asm]
     if is_function_stack:
-      function_stack.append(asm) # Technically this should be 'current value of' not just the register
+      function_stack.append(asm)
     else:
       stack.append(asm)
     asm = ''
@@ -371,15 +351,21 @@ for line in p.open('r'):
     asm = ''
   elif inst == 'call':
     asm = asm.split('.')[-1]
+    try:
+      asm = to_hex_str(int(asm, 16))
+    except ValueError:
+      pass
+    args = []
     if CALLING_CONVENTION == 'x86 fastcall':
-      args = 'ecx, edx'
-      if len(function_stack) > 0:
-        args += ', ' + ', '.join(reversed(function_stack))
-    asm = f'func_{asm}({args})'
-    if CALLING_CONVENTION in ['x86 fastcall']:
+      args += [reg_values['ecx'], reg_values['edx']]
+    elif CALLING_CONVENTION == 'x86 thiscall':
+      args += [reg_values['ecx']]
+    if len(function_stack) > 0:
+      args += reversed(function_stack)
+    asm = f"func_{asm}({', '.join(args)})"
+    if CALLING_CONVENTION in ['x86 fastcall', 'x86 thiscall']:
+      asm = 'eax = ' + asm
       function_stack = []
-    else:
-      pass # TODO: Non-callee saved conventions don't work like this.
   elif inst == 'rep':
     if asm == 'stosb':
       size = 1
@@ -409,13 +395,13 @@ for line in p.open('r'):
     df_flag = '-' # Reverses the direction of 'rep' instructions
     asm = ''
   elif inst == 'xorps':
-    dst, src = asm.split(',')
+    dst, src = split(asm)
     if dst == src:
-      asm = f'{dst} = 0'
+      asm = assign(dst, '0')
     else:
       asm = inst + '\t' + asm
   elif inst == 'comiss':
-    dst, src = asm.split(',')
+    dst, src = split(asm)
     asm = ''
     last_cmp = {
       'je': f'{dst} == {src}',
@@ -429,8 +415,27 @@ for line in p.open('r'):
       'ja': f'{dst} > {src}',
       'jae': f'{dst} >= {src}',
     }
-  elif inst in ['fldz', 'fstp']: # I'm sure these do something, but I can't tell what. So, I'm ignoring them until I figure it out.
+  elif inst in ['fild', 'fld']:
+    dst, src = split(asm)
+    fpu_stack.insert(0, src)
     asm = ''
+  elif inst == 'fadd':
+    dst, src = split(asm)
+    if src == 'st(0)':
+      src = fpu_stack[0]
+    asm = assign(dst, f'{dst} + {src}')
+  elif inst == 'fldz':
+    fpu_stack.insert(0, '0.0f')
+    print(fpu_stack)
+    asm = ''
+  elif inst in ['fst', 'fstp']:
+    if len(fpu_stack) > 0: # Sometimes there aren't enough items in the fpu stack. IDK.
+      dst, src = split(asm)
+      if src == 'st(0)':
+        src = fpu_stack[0]
+      asm = assign(dst, src)
+      if inst == 'fstp':
+        fpu_stack.pop(0)
 
   else:
     print(f'Missing instruction: {inst}')
