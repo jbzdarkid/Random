@@ -252,11 +252,14 @@ for line in p.open('r'):
         product = 'rdx:rax'
       else:
         assert(False)
-      asm = assign(product, f'{multiplicand} * {multiplier}')
-      if inst == 'mul':
-        asm += ' // Note: Unsigned multiplication'
-    else:
-      asm = inst + '\t' + asm
+    elif asm.count(',') == 1:
+      multiplicand, multiplier = asm.split(',')
+      product = multiplicand
+    elif asm.count(',') == 2:
+      product, multiplicand, multiplier = asm.split(',')
+    asm = assign(product, f'{multiplicand} * {multiplier}')
+    if inst == 'mul':
+      asm += ' // Note: Unsigned multiplication'
   elif inst == 'inc':
     assign(asm, f'{asm} + 1')
     asm = f'{asm}++'
@@ -274,15 +277,6 @@ for line in p.open('r'):
       src = 0
     if inst in ['sub', 'add', 'and', 'or', 'xor']:
       op = {'sub': '-', 'add': '+', 'and': '&', 'or': '|', 'xor': '^'}[inst]
-      if inst in ['and', 'or']:
-        try:
-          amt = int(src, 16)
-          if amt >= 0x80000000: # High bit is set, use 2's complement instead
-            src = f'~{to_hex_str(0xFFFFFFFF - amt)}'
-          else:
-            src = to_hex_str(amt)
-        except ValueError:
-          pass # Register, not immediate
       if inst == 'xor' and dst == src:
         asm = assign(dst, '0')
       elif inst == 'or' and src == '0xFFFFFFFF':
@@ -298,6 +292,15 @@ for line in p.open('r'):
             pass
             # stack.pop()
       else:
+        if inst in ['and', 'or']:
+          try:
+            amt = int(src, 16)
+            if amt >= 0x80000000: # High bit is set, use 2's complement instead
+              src = f'~{to_hex_str(0xFFFFFFFF - amt)}'
+            else:
+              src = to_hex_str(amt)
+          except ValueError:
+            pass # Register, not immediate
         asm = assign(dst, f'{dst} {op} {src}')
       src = 0
       last_cmp.update({
@@ -331,6 +334,7 @@ for line in p.open('r'):
     asm = ''
   elif inst == 'ret':
     # TODO: Somehow restore the stack... As a workaround, I'm not popping registers from the stack!
+    # Instead, we clear the stack after each call.
     # amt = int(asm, 16) if asm else 0
     # asm = 'pop\n' * (amt // 4) + 'return'
     # @Assume the compiler knows what it's doing
@@ -427,12 +431,13 @@ for line in p.open('r'):
     asm = ''
   elif inst == 'fadd':
     dst, src = split(asm)
+    if dst == 'st(0)':
+      dst = fpu_stack[0]
     if src == 'st(0)':
       src = fpu_stack[0]
     asm = assign(dst, f'{dst} + {src}')
   elif inst == 'fldz':
     fpu_stack.insert(0, '0.0f')
-    print(fpu_stack)
     asm = ''
   elif inst in ['fst', 'fstp']:
     if len(fpu_stack) > 0: # Sometimes there aren't enough items in the fpu stack. IDK.
@@ -442,6 +447,12 @@ for line in p.open('r'):
       asm = assign(dst, src)
       if inst == 'fstp':
         fpu_stack.pop(0)
+  elif inst == 'fmul':
+    if len(fpu_stack) > 0: # Sometimes there aren't enough items in the fpu stack. IDK.
+      dst, src = split(asm)
+      asm = assign(fpu_stack[0], f'{fpu_stack[0]} * {src}')
+  elif inst == 'int3':
+    asm = ''
 
   else:
     print(f'Missing instruction: {inst}')
