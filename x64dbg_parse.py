@@ -193,9 +193,9 @@ for line in p.open('r'):
       asm = f'if ({last_cmp[inst]}) goto {to_hex_str(asm)}'
     last_cmp = None # @Assume compilers do not make multiple jumps with the same flags
     is_function_stack = True
-  elif inst in ['setne']:
+  elif inst in ['setne', 'sete']:
     assert(last_cmp)
-    inst = {'setne': 'jne'}[inst]
+    inst = {'setne': 'jne', 'sete': 'je'}[inst]
     if inst not in last_cmp:
       asm = inst + '\t' + asm
       print(f'Don\'t know how to execute jump {inst}')
@@ -218,13 +218,16 @@ for line in p.open('r'):
     asm = assign(reg, f'{reg} >> {int(amt, 16)}') + ' // Note: does not preserve sign'
   elif inst[:3] == 'mov':
     dst, src = split(asm)
-    asm = assign(dst, src)
+    note = ''
     try:
       amt = int(src, 16)
-      if amt > 0x0100000: # Large number, may indicate multiplication offset. TODO: Just look for a subsequent mul/imul?
-        asm += f' // Note: Large value is actually 2^32 / {0x100000000 / amt}'
+      if amt >= 0x80000000: # Negative number
+        src = -(0x100000000 - amt)
+      elif amt > 0x00100000: # Large number, may indicate multiplication offset. TODO: Just look for a subsequent mul/imul?
+        note = f' // Note: Large value is actually 2^32 / {0x100000000 / amt}'
     except ValueError:
       pass
+    asm = assign(dst, src) + note
   elif inst == 'lea':
     dst, src = split(asm)
     if src[0] == '[' and src[-1] == ']':
@@ -253,7 +256,7 @@ for line in p.open('r'):
       if inst == 'mul':
         asm += ' // Note: Unsigned multiplication'
     else:
-      asm = isnt + '\t' + asm
+      asm = inst + '\t' + asm
   elif inst == 'inc':
     assign(asm, f'{asm} + 1')
     asm = f'{asm}++'
@@ -329,11 +332,14 @@ for line in p.open('r'):
   elif inst == 'ret':
     # TODO: Somehow restore the stack... As a workaround, I'm not popping registers from the stack!
     # amt = int(asm, 16) if asm else 0
-    amt = 0 # @Assume the compiler knows what it's doing
-    asm = 'pop\n' * (amt // 4) + 'return'
+    # asm = 'pop\n' * (amt // 4) + 'return'
+    # @Assume the compiler knows what it's doing
+    asm = 'return ' + reg_values['eax']
     unreachable_code = True
   elif inst == 'push':
     if hex[0] in [0x6A, 0x68]:
+      if '.' in asm:
+        asm = asm.split('.')[1]
       asm = to_hex_str(int(asm, 16))
     elif asm in reg_values:
       asm = reg_values[asm]
