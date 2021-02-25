@@ -46,6 +46,11 @@ def split(asm):
 def strip(str):
   str = str.strip()
 
+  if m := re.fullmatch('st\((\d+)\)', str):
+    i = int(m.group(1))
+    if len(fpu_stack) > i:
+      str = fpu_stack[i]
+
   is_byte = ('byte ptr' in str)
   m = re.search('\[.*?\]', str)
   if m:
@@ -53,7 +58,7 @@ def strip(str):
   if is_byte:
     str = f'(byte){str}'
 
-  m = re.search('\[esp ?\+ ?(.+)\]', str)
+  m = re.search('\[(?:e|r)sp ?\+ ?(.+)\]', str)
   if m:
     stack_offset = int(m.group(1), 16)
     if stack_offset % 4 != 0:
@@ -97,11 +102,22 @@ def to_hex_str(num, len=8):
 exe = r'C:\Program Files (x86)\Steam\steamapps\common\Dark Souls Prepare to Die Edition\DATA\DARKSOULS.exe'
 with open(exe, 'rb') as f:
   assembly = f.read()
-
-# for i in range(len(assembly)):
-#   if assembly[i:i+8] == b'\xB7\xCD\x58\x00\xF7\xCD\x58\x00':
-#     print(to_hex_str(i))
-
+"""
+static_loads = {}
+for i, byte in enumerate(assembly):
+  if byte == 0xA1:
+    addr = int.from_bytes(assembly[i+1:i+5], byteorder=ENDINNESS)
+  elif byte == 0x8B and assembly[i+1] in [0x1D, 0x0D, 0x15, 0x3D, 0x35, 0x25, 0x2D]:
+    addr = int.from_bytes(assembly[i+2:i+6], byteorder=ENDINNESS)
+  else:
+    continue
+  if addr not in static_loads:
+    static_loads[addr] = {'sources': []}
+  static_loads[addr]['sources'].append(to_hex_str(i + 0x400C00))
+sorted_static_loads = sorted([(len(static_loads[addr]['sources']), addr, static_loads[addr]['sources']) for addr in static_loads])
+for count, addr, sources in sorted_static_loads:
+  print(f'addr: {to_hex_str(addr)} is loaded {count} times: [{", ".join(sources[:5])}]')
+"""
 def get_switch_statement(addr, inst, size, num_cases=16):
   addr = addr - 0x400C00 # Module base address...?
   cases = {}
@@ -140,11 +156,30 @@ stack = []
 function_stack = []
 fpu_stack = ['st(0)']
 is_function_stack = False
-last_cmp = None
 unreachable_code = False
 code_is_data = False
 data_bytes = []
 df_flag = '+'
+
+last_cmp_ = (None, None)
+def last_cmp(type):
+  global last_cmp_
+  cmp = {
+    'je': '==', 'sete': '==',
+    'jne': '!=', 'setne': '!=', 'cmovne': '!=',
+    'jl': '<', 'jb': '<', 'js': '<',
+    'jle': '<=', 'jbe': '<=',
+    'jg': '>', 'ja': '>',
+    'jge': '>=', 'jae': '>=', 'jns': '>=',
+    # jp, jnp
+  }
+  if type not in cmp:
+    return f'FAILURE: Unknown comparison type {type}'
+  dst, src = last_cmp_
+  if dst is None or src is None:
+    return 'FAILURE: Comparison has unknown dst/src'
+  last_cmp_ = (None, None) # @Assume compilers do not make multiple jumps with the same flags
+  return f'{dst} {cmp[type]} {src}'
 
 for line in p.open('r'):
   if line.count('|') != 3:
@@ -182,25 +217,15 @@ for line in p.open('r'):
 
     # Code which follows an unconditional jump should not be interpreted, until we reach an instruction which can be jumped to.
     unreachable_code = True
-  elif inst in ['je', 'jne', 'jl', 'jle', 'jb', 'jbe', 'jg', 'jge', 'ja', 'jae', 'jp', 'jnp']:
+  elif inst in ['je', 'jne', 'jl', 'jle', 'jb', 'jbe', 'jg', 'jge', 'ja', 'jae', 'jp', 'jnp', 'js', 'jns']:
     asm = int(asm.split('.')[-1], 16)
     jumps.add(asm)
-    assert(last_cmp)
-    if inst not in last_cmp:
-      asm = f'{inst}\t{asm}'
-      print(f'Don\'t know how to execute jump {inst}')
-    else:
-      asm = f'if ({last_cmp[inst]}) goto {to_hex_str(asm)}'
-    last_cmp = None # @Assume compilers do not make multiple jumps with the same flags
+    asm = f'if ({last_cmp(inst)}) goto {to_hex_str(asm)}'
     is_function_stack = True
   elif inst in ['setne', 'sete']:
-    assert(last_cmp)
-    inst = {'setne': 'jne', 'sete': 'je'}[inst]
-    if inst not in last_cmp:
-      asm = inst + '\t' + asm
-      print(f'Don\'t know how to execute jump {inst}')
-    else:
-      asm = f'if ({last_cmp[inst]}) ' + assign(asm, 0x01)
+    asm = f'if ({last_cmp(inst)}) ' + assign(asm, 0x01)
+  elif inst in ['cmovne']:
+    asm = f'if ({last_cmp(inst)}) ' + assign(dst, src)
   elif inst in ['sar', 'shl', 'sal']:
     reg, amt = asm.split(',')
     try:
@@ -260,37 +285,37 @@ for line in p.open('r'):
     asm = assign(product, f'{multiplicand} * {multiplier}')
     if inst == 'mul':
       asm += ' // Note: Unsigned multiplication'
-  elif inst == 'inc':
-    assign(asm, f'{asm} + 1')
-    asm = f'{asm}++'
-  elif inst == 'dec':
-    assign(asm, f'{asm} - 1')
-    asm = f'{asm}--'
+  elif inst in ['inc', 'dec']:
+    dst = strip(asm)
+    op = {'inc': '+', 'dec': '-'}[inst]
+    assign(dst, f'{dst} {op} 1')
+    last_cmp_ = (dst, 0)
+    asm = f'{dst}{op}{op}'
   elif inst == 'neg':
     asm = assign(asm, f'~{asm}')
-  elif inst in ['test', 'cmp', 'sub', 'add', 'and', 'or', 'xor']:
+  elif inst in ['test', 'cmp']:
     dst, src = split(asm)
-    asm = ''
-
-    last_cmp = {}
     if inst == 'test' and dst == src:
       src = 0
-    if inst in ['sub', 'add', 'and', 'or', 'xor']:
+    last_cmp_ = (dst, src)
+    asm = ''
+  elif inst in ['sub', 'add', 'and', 'or', 'xor']:
+    dst, src = split(asm)
+    if dst in ['esp', 'rsp']: # Special case for stack pointer modifications
+      amt = int(src, 16)
+      if inst == 'sub':
+        for i in range(amt // 4):
+          stack.append(f'local_{i}')
+      elif inst == 'add':
+        for _ in range(amt // 4):
+          pass # stack.pop()
+      asm = ''
+    else:
       op = {'sub': '-', 'add': '+', 'and': '&', 'or': '|', 'xor': '^'}[inst]
       if inst == 'xor' and dst == src:
         asm = assign(dst, '0')
       elif inst == 'or' and src == '0xFFFFFFFF':
         asm = assign(dst, '-1')
-      elif dst == 'esp':
-        amt = int(src, 16)
-        asm = ''
-        if inst == 'sub':
-          for i in range(amt // 4):
-            stack.append(f'local_{i}')
-        elif inst == 'add':
-          for _ in range(amt // 4):
-            pass
-            # stack.pop()
       else:
         if inst in ['and', 'or']:
           try:
@@ -302,32 +327,7 @@ for line in p.open('r'):
           except ValueError:
             pass # Register, not immediate
         asm = assign(dst, f'{dst} {op} {src}')
-      src = 0
-      last_cmp.update({
-        'js': f'{dst} < {src}',
-        'jns': f'{dst} >= {src}',
-      })
-
-    # Note: Comparison with overflow
-    # To distribute addition across a modulo operation (e.g. cast to short), use the following template:
-    # (short)(x + A) > B  is equivalent to
-    # (x > B - A && x < 0x10000 - A) || (x > B - A + 0x10000)
-    #
-    # (short)(x + A) < B  is equivalent to
-    # (x < B - A) || (x >= 0x10000 - A && x < B + 0x10000 - A)
-
-    last_cmp.update({
-      'je': f'{dst} == {src}',
-      'jne': f'{dst} != {src}',
-      'jl': f'{dst} < {src}',
-      'jle': f'{dst} <= {src}',
-      'jb': f'{dst} < {src}',
-      'jbe': f'{dst} <= {src}',
-      'jg': f'{dst} > {src}',
-      'jge': f'{dst} >= {src}',
-      'ja': f'{dst} > {src}',
-      'jae': f'{dst} >= {src}',
-    })
+    last_cmp_ = (dst, 0)
   elif inst == 'nop':
     asm = ''
   elif inst == 'leave':
@@ -340,6 +340,8 @@ for line in p.open('r'):
     # @Assume the compiler knows what it's doing
     asm = 'return ' + reg_values['eax']
     unreachable_code = True
+  elif inst == 'int3':
+    asm = ''
   elif inst == 'push':
     if hex[0] in [0x6A, 0x68]:
       if '.' in asm:
@@ -411,48 +413,41 @@ for line in p.open('r'):
     else:
       asm = inst + '\t' + asm
   elif inst == 'comiss':
-    dst, src = split(asm)
+    last_cmp_ = split(asm)
     asm = ''
-    last_cmp = {
-      'je': f'{dst} == {src}',
-      'jne': f'{dst} != {src}',
-      'jl': f'{dst} < {src}',
-      'jle': f'{dst} <= {src}',
-      'jb': f'{dst} < {src}',
-      'jbe': f'{dst} <= {src}',
-      'jg': f'{dst} > {src}',
-      'jge': f'{dst} >= {src}',
-      'ja': f'{dst} > {src}',
-      'jae': f'{dst} >= {src}',
-    }
   elif inst in ['fild', 'fld']:
     dst, src = split(asm)
     fpu_stack.insert(0, src)
     asm = ''
-  elif inst == 'fadd':
-    dst, src = split(asm)
-    if dst == 'st(0)':
-      dst = fpu_stack[0]
-    if src == 'st(0)':
-      src = fpu_stack[0]
-    asm = assign(dst, f'{dst} + {src}')
   elif inst == 'fldz':
     fpu_stack.insert(0, '0.0f')
     asm = ''
-  elif inst in ['fst', 'fstp']:
-    if len(fpu_stack) > 0: # Sometimes there aren't enough items in the fpu stack. IDK.
-      dst, src = split(asm)
-      if src == 'st(0)':
-        src = fpu_stack[0]
-      asm = assign(dst, src)
-      if inst == 'fstp':
-        fpu_stack.pop(0)
-  elif inst == 'fmul':
-    if len(fpu_stack) > 0: # Sometimes there aren't enough items in the fpu stack. IDK.
-      dst, src = split(asm)
-      asm = assign(fpu_stack[0], f'{fpu_stack[0]} * {src}')
-  elif inst == 'int3':
-    asm = ''
+  elif inst in ['fadd', 'faddp', 'fiadd', 'fsub', 'fsubp', 'subsd', 'fmul', 'fmulp']:
+    dst, src = split(asm)
+    if inst in ['fiadd']:
+      src = f'(float){src}'
+    last_cmp_ = (dst, src)
+    op = {'fadd': '+', 'faddp': '+', 'fiadd': '+', 'fsub': '-', 'fsubp': '-', 'subsd': '-', 'fmul': '*', 'fmulp': '*'}[inst]
+    asm = assign(dst, f'{dst} {op} {src}')
+    if inst in ['faddp', 'fsubp', 'fmulp'] and len(fpu_stack) > 0:
+      fpu_stack.pop(0)
+  elif inst in ['fst', 'fstp', 'fistp']:
+    dst, src = split(asm)
+    if inst == 'fistp':
+      src = f'(float){src}'
+    asm = assign(dst, src)
+    if inst == 'fstp' and len(fpu_stack) > 0:
+      fpu_stack.pop(0)
+  elif inst in ['cvtps2pd']:
+    dst, src = split(asm)
+    asm = assign(dst, f'(double){src}') + ' // Convert float to double'
+  elif inst in ['cvtpd2ps', 'cvttsd2si']:
+    dst, src = split(asm)
+    asm = assign(dst, f'(float){src}') + ' // Convert double to float'
+  elif inst == 'fxch':
+    dst, src = split(asm)
+    asm = assign(dst, src) + '\n' + assign(src, dst)
+
 
   else:
     print(f'Missing instruction: {inst}')
