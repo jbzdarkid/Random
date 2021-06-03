@@ -6,6 +6,7 @@ from textwrap import dedent
 # https://en.wikipedia.org/wiki/X86_calling_conventions#List_of_x86_calling_conventions
 # CALLING_CONVENTION = 'x86 fastcall'
 CALLING_CONVENTION = 'x86 thiscall'
+# CALLING_CONVENTION == 'x64 fastcall':
 ENDINNESS = 'little'
 
 # TODO: Extend this table for x64. Or just replace it, since we need to use rax, etc.
@@ -51,6 +52,9 @@ def strip(str):
     if len(fpu_stack) > i:
       str = fpu_stack[i]
 
+  if str == 'dword ptr fs:[0]':
+    return 'SEH' # Current SEH frame, according to https://en.wikipedia.org/wiki/Win32_Thread_Information_Block
+
   is_byte = ('byte ptr' in str)
   m = re.search('\[.*?\]', str)
   if m:
@@ -58,11 +62,15 @@ def strip(str):
   if is_byte:
     str = f'(byte){str}'
 
-  m = re.search('\[(?:e|r)sp ?\+ ?(.+)\]', str)
-  if m:
-    stack_offset = int(m.group(1), 16)
+  if m := re.search('\[(?:e|r)(s|b)p ?\+ ?(.+)\]', str):
+    stack_offset = int(m.group(2), 16)
     if stack_offset % 4 != 0:
       return str # Uneven stack offset, unsure how to handle
+
+    if m.group(1) == 'b': # ebp, rbp
+      stack_offset = len(stack) + len(function_stack) - stack_offset
+      if stack_offset < 0:
+        return str # Too large stack offset, unsure how to handle
 
     stack_offset = stack_offset // 4
     if stack_offset < len(function_stack):
@@ -103,7 +111,24 @@ exe = r'C:\Program Files (x86)\Steam\steamapps\common\Dark Souls Prepare to Die 
 with open(exe, 'rb') as f:
   assembly = f.read()
 """
+def search_for_function(function_addr):
+  calls = []
+  for i, byte in enumerate(assembly):
+    if assembly[i] == 0xE8:
+      offset = int.from_bytes(assembly[i+1:i+5], byteorder=ENDINNESS, signed=True)
+      call = i + 0x400C00 + offset + 5
+      if call == function_addr:
+        calls.append(i + 0x400C00)
+  return calls
+
+calls = search_for_function(0x0046EE10)
+call_strs = ', '.join(map(to_hex_str, calls))
+print(f'{len(calls)} calls: [{call_strs}]')
+raise
+
+
 static_loads = {}
+count = 0
 for i, byte in enumerate(assembly):
   if byte == 0xA1:
     addr = int.from_bytes(assembly[i+1:i+5], byteorder=ENDINNESS)
@@ -114,10 +139,12 @@ for i, byte in enumerate(assembly):
   if addr not in static_loads:
     static_loads[addr] = {'sources': []}
   static_loads[addr]['sources'].append(to_hex_str(i + 0x400C00))
+print(count)
 sorted_static_loads = sorted([(len(static_loads[addr]['sources']), addr, static_loads[addr]['sources']) for addr in static_loads])
 for count, addr, sources in sorted_static_loads:
   print(f'addr: {to_hex_str(addr)} is loaded {count} times: [{", ".join(sources[:5])}]')
 """
+
 def get_switch_statement(addr, inst, size, num_cases=16):
   addr = addr - 0x400C00 # Module base address...?
   cases = {}
@@ -178,7 +205,7 @@ def last_cmp(type):
   dst, src = last_cmp_
   if dst is None or src is None:
     return 'FAILURE: Comparison has unknown dst/src'
-  last_cmp_ = (None, None) # @Assume compilers do not make multiple jumps with the same flags
+  # last_cmp_ = (None, None) # @Assume compilers do not make multiple jumps with the same flags. Gah, this isn't true. Well whatever.
   return f'{dst} {cmp[type]} {src}'
 
 for line in p.open('r'):
@@ -225,6 +252,7 @@ for line in p.open('r'):
   elif inst in ['setne', 'sete']:
     asm = f'if ({last_cmp(inst)}) ' + assign(asm, 0x01)
   elif inst in ['cmovne']:
+    dst, src = split(asm)
     asm = f'if ({last_cmp(inst)}) ' + assign(dst, src)
   elif inst in ['sar', 'shl', 'sal']:
     reg, amt = asm.split(',')
@@ -269,13 +297,14 @@ for line in p.open('r'):
       elif hex[0] == 0x66:
         multiplicand = 'ax'
         product = 'dx:ax'
-      elif hex[0] == 0xF7:
+      elif hex[0] in [0xF7, 0x41]:
         multiplicand = 'eax'
         product = 'edx:eax'
       elif hex[0] == 0x48:
         multiplicand = 'rax'
         product = 'rdx:rax'
       else:
+        print(hex)
         assert(False)
     elif asm.count(',') == 1:
       multiplicand, multiplier = asm.split(',')
@@ -295,7 +324,9 @@ for line in p.open('r'):
     asm = assign(asm, f'~{asm}')
   elif inst in ['test', 'cmp']:
     dst, src = split(asm)
-    if inst == 'test' and dst == src:
+    if inst == 'test':
+      if dst != src:
+        dst = f'{dst} & {src}'
       src = 0
     last_cmp_ = (dst, src)
     asm = ''
@@ -349,11 +380,13 @@ for line in p.open('r'):
       asm = to_hex_str(int(asm, 16))
     elif asm in reg_values:
       asm = reg_values[asm]
+
     if is_function_stack:
       function_stack.append(asm)
+      asm = '// ' + orig_asm.replace('   ', '') # @Hack, until I do SSA
     else:
       stack.append(asm)
-    asm = ''
+      asm = ''
   elif inst == 'pop':
     if len(function_stack) > 0:
       function_stack.pop()
@@ -368,15 +401,22 @@ for line in p.open('r'):
     except ValueError:
       pass
     args = []
-    if CALLING_CONVENTION == 'x86 fastcall':
-      args += [reg_values['ecx'], reg_values['edx']]
+    if CALLING_CONVENTION == 'x64 fastcall':
+      args += [reg_values['rcx'] + ' /*rcx*/', reg_values['rdx'] + ' /*rdx*/']
+    elif CALLING_CONVENTION == 'x86 fastcall':
+      args += [reg_values['ecx'] + ' /*ecx*/', reg_values['edx'] + ' /*edx*/']
     elif CALLING_CONVENTION == 'x86 thiscall':
-      args += [reg_values['ecx']]
+      args += [reg_values['ecx'] + ' /*ecx*/']
     if len(function_stack) > 0:
       args += reversed(function_stack)
     asm = f"func_{asm}({', '.join(args)})"
     if CALLING_CONVENTION in ['x86 fastcall', 'x86 thiscall']:
       asm = 'eax = ' + asm
+      assign('eax', 'eax') # Don't infer values of eax through a function call.
+      function_stack = []
+    if CALLING_CONVENTION in ['x64 fastcall']:
+      asm = 'rax = ' + asm
+      assign('rax', 'rax') # Don't infer values of eax through a function call.
       function_stack = []
   elif inst == 'rep':
     if asm == 'stosb':
