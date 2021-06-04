@@ -2,8 +2,7 @@ from time import sleep
 from winsound import Beep
 from math import pi
 from subprocess import check_output
-from os import system
-import win32gui, win32ui, win32con, win32api
+import win32gui, win32ui, win32con
 # TODO: Automatic photomerge? -- working on it
 # Maybe crop capture further to avoid some lens distortion? 50% square might work.
 

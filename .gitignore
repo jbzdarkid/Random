@@ -18,3 +18,4 @@ tmp
 *.ilk
 *.suo
 */Assembly-CSharp/*
+*.vs/
