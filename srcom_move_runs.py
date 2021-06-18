@@ -32,7 +32,7 @@ def nonnull(value):
   return '' if (value is None) else value
 
 while True:
-  j = requests.get(f'https://www.speedrun.com/api/v1/runs', params=params).json()
+  j = requests.get('https://www.speedrun.com/api/v1/runs', params=params).json()
   for d in j['data']:
     if d['status']['status'] != 'verified':
       raise ValueError('Run is not verified: ' + d['status'])
