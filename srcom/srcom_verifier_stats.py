@@ -1,25 +1,13 @@
 import requests
+import utils
 
 # Get game ID by name:
 # https://www.speedrun.com/api/v1/games?name=The%20Witness
 
-params = {'game': 'ldegnl13', 'offset': 0}
-
-runs = []
-while True:
-  j = requests.get('https://www.speedrun.com/api/v1/runs', params=params).json()
-  runs += j['data']
-  print(f'Found {len(runs)} runs')
-
-  if any(link['rel'] == 'next' for link in j['pagination']['links']):
-    params['offset'] += 20
-  else:
-    break
+runs = utils.get_runs('ldegnl13')
 
 runs.sort(key=lambda run: run['submitted'], reverse=True)
 print()
-
-verifier_names = {}
 
 def count_statistics(runs):
   counts = {}
@@ -28,15 +16,11 @@ def count_statistics(runs):
       continue # Runs which have not yet been verified
 
     verifier = run['status']['examiner']
-    if verifier not in verifier_names:
-      j = requests.get(f'https://www.speedrun.com/api/v1/users/{verifier}').json()
-      verifier_names[verifier] = j['data']['names']['international']
-
     if verifier not in counts:
       counts[verifier] = 1
     else:
       counts[verifier] += 1
-  sorted_counts = [(verifier_names[verifier], counts[verifier], round(counts[verifier] / len(runs) * 100, 2)) for verifier in counts]
+  sorted_counts = [(utils.get_name(verifier), counts[verifier], round(counts[verifier] / len(runs) * 100, 2)) for verifier in counts]
   sorted_counts.sort(key=lambda s: s[1], reverse=True)
   return sorted_counts
 

@@ -3,19 +3,7 @@ import requests
 # Get game ID by name:
 # https://www.speedrun.com/api/v1/games?name=The%20Witness
 
-params = {'game': 'ldegnl13', 'offset': 0}
-
-runs = []
-while True:
-  j = requests.get('https://www.speedrun.com/api/v1/runs', params=params).json()
-  runs += j['data']
-  print(f'Found {len(runs)} runs')
-
-  if any(link['rel'] == 'next' for link in j['pagination']['links']):
-    params['offset'] += 20
-  else:
-    break
-
+runs = utils.get_runs(game='ldegnl13')
 runs.sort(key=lambda run: run['submitted'])
 
 names = {}
