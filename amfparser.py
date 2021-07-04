@@ -68,7 +68,7 @@ class Bytes():
     elif type == TYPE_STRING:
       size = unpack('>H', self.read_bytes(2))[0]
       debug(f'Found string of length {size}')
-      return self.read_bytes(size).decode('utf-8')
+      return self.read_bytes(size).decode('utf-8').strip().strip('\x00')
 
     elif type == TYPE_OBJECT: # Dynamic map
       debug('Reading map')
