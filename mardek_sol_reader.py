@@ -33,6 +33,7 @@ for folder in [
 savefiles.sort()
 
 for file in savefiles:
+  print(f'\nSave file {file.name}')
   b = Bytes(file)
   if sys.argv[1] == 'read':
     b.seek(b'PCloc')
@@ -58,4 +59,13 @@ for file in savefiles:
         raise ValueError('Bad space count. Provide "X Y" or "X Y map_name"')
       b.seek(b'PCloc')
       b.amf0_write([x, y, map_name])
+    if clear_maps := input('Change maps? ("Hide"/"Show"/""): '):
+      rle_char = 'Y' if (clear_maps.lower()[0] == 's') else 'N'
+      b.seek(b'Maps')
+      maps = b.amf0_read()
+      for name, rle in maps.items():
+        width, height = map(int, rle.split('|')[0].split('_'))
+        maps[name] = rle.split('|')[0] + f'|{width * height}{rle_char}'
+      b.seek(b'Maps')
+      b.amf0_write(maps)
     b.write_to_disk()
