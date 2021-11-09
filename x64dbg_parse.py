@@ -1,12 +1,14 @@
-from pathlib import Path
+import math
 import re
+import struct
 import sys
+from pathlib import Path
 from textwrap import dedent
 
 # https://en.wikipedia.org/wiki/X86_calling_conventions#List_of_x86_calling_conventions
 # CALLING_CONVENTION = 'x86 fastcall'
-CALLING_CONVENTION = 'x86 thiscall'
-# CALLING_CONVENTION == 'x64 fastcall':
+# CALLING_CONVENTION = 'x86 thiscall'
+CALLING_CONVENTION = 'x64 fastcall'
 ENDINNESS = 'little'
 
 # TODO: Extend this table for x64. Or just replace it, since we need to use rax, etc.
@@ -38,6 +40,10 @@ register_replacements_x64 = {
   'r8b':  '(byte)r8',
   'r8w':  '(short)r8',
   'r8d':  '(int)r8',
+  'eax':  '(int)rax',
+  'ebx':  '(int)rbx',
+  'ecx':  '(int)rcx',
+  'edx':  '(int)rdx',
 }
 
 def split(asm):
@@ -88,13 +94,18 @@ def strip(str):
   return str
 
 reg_values = {
-  'eax': 'orig_eax',
-  'ebx': 'orig_ebx',
-  'ecx': 'orig_ecx',
-  'edx': 'orig_edx',
-  'esi': 'orig_esi',
-  'ebp': 'orig_ebp',
+  'rax': 'orig_rax',
+  'rbx': 'orig_rbx',
+  'rcx': 'orig_rcx',
+  'rdx': 'orig_rdx',
+  'rsi': 'orig_rsi',
+  'rbp': 'orig_rbp',
+  'r8':  'orig_r8',
+  'r9':  'orig_r9',
+  'r10': 'orig_r10',
+  'r11': 'orig_r11',
 }
+
 def assign(dst, src):
   for key in reg_values:
     if key in dst:
@@ -106,44 +117,6 @@ def to_hex_str(num, len=8):
   assert(ENDINNESS == 'little')
   # TODO: return '0x' + builtins.hex(num)[2:].upper()
   return '0x' + builtins.hex(num)[2:].upper().zfill(len)
-
-exe = r'C:\Program Files (x86)\Steam\steamapps\common\Dark Souls Prepare to Die Edition\DATA\DARKSOULS.exe'
-with open(exe, 'rb') as f:
-  assembly = f.read()
-"""
-def search_for_function(function_addr):
-  calls = []
-  for i, byte in enumerate(assembly):
-    if assembly[i] == 0xE8:
-      offset = int.from_bytes(assembly[i+1:i+5], byteorder=ENDINNESS, signed=True)
-      call = i + 0x400C00 + offset + 5
-      if call == function_addr:
-        calls.append(i + 0x400C00)
-  return calls
-
-calls = search_for_function(0x0046EE10)
-call_strs = ', '.join(map(to_hex_str, calls))
-print(f'{len(calls)} calls: [{call_strs}]')
-raise
-
-
-static_loads = {}
-count = 0
-for i, byte in enumerate(assembly):
-  if byte == 0xA1:
-    addr = int.from_bytes(assembly[i+1:i+5], byteorder=ENDINNESS)
-  elif byte == 0x8B and assembly[i+1] in [0x1D, 0x0D, 0x15, 0x3D, 0x35, 0x25, 0x2D]:
-    addr = int.from_bytes(assembly[i+2:i+6], byteorder=ENDINNESS)
-  else:
-    continue
-  if addr not in static_loads:
-    static_loads[addr] = {'sources': []}
-  static_loads[addr]['sources'].append(to_hex_str(i + 0x400C00))
-print(count)
-sorted_static_loads = sorted([(len(static_loads[addr]['sources']), addr, static_loads[addr]['sources']) for addr in static_loads])
-for count, addr, sources in sorted_static_loads:
-  print(f'addr: {to_hex_str(addr)} is loaded {count} times: [{", ".join(sources[:5])}]')
-"""
 
 def get_switch_statement(addr, inst, size, num_cases=16):
   addr = addr - 0x400C00 # Module base address...?
@@ -175,7 +148,25 @@ def get_switch_statement(addr, inst, size, num_cases=16):
 
   return output
 
-p = Path('raw.txt')
+def bytes_to_int(bytes, *, unsigned=False):
+  val = int.from_bytes(bytes, byteorder=ENDINNESS)
+  if not unsigned and val >= 0x80000000: # Negative number
+    val = -(0x100000000 - val)
+  return val
+
+def bytes_to_float(bytes):
+  if ENDINNESS == 'big':
+    bytes = reversed(bytes)
+  return struct.unpack('f', bytearray(bytes))[0]
+
+def bytes_to_fraction(bytes):
+  value = bytes_to_int(bytes, unsigned=True)
+  numer = 0x1000
+  denom = round(numer * 0x100000000 / value)
+  gcd = math.gcd(numer, denom)
+  return f'2^32 * ({numer // gcd}/{denom // gcd})'
+
+p = Path(sys.argv[1])
 jumps = set()
 data_jumps = set()
 lines = []
@@ -192,11 +183,11 @@ last_cmp_ = (None, None)
 def last_cmp(type):
   global last_cmp_
   cmp = {
-    'je': '==', 'sete': '==',
+    'je': '==', 'sete': '==', 'cmove': '==',
     'jne': '!=', 'setne': '!=', 'cmovne': '!=',
     'jl': '<', 'jb': '<', 'js': '<',
     'jle': '<=', 'jbe': '<=',
-    'jg': '>', 'ja': '>',
+    'jg': '>', 'ja': '>', 'cmovg': '>',
     'jge': '>=', 'jae': '>=', 'jns': '>=',
     # jp, jnp
   }
@@ -226,21 +217,26 @@ for line in p.open('r'):
     asm = ''
   asm = asm.lstrip()
   if inst == 'jmp':
-    asm = asm.split('.')[-1]
-    try:
-      asm = int(asm, 16)
+    if hex[0] == 0xE9:
+      asm = addr + bytes_to_int(hex[1:]) + len(hex)
       jumps.add(asm)
       asm = f'goto {to_hex_str(asm)}'
-    except ValueError:
-      m = re.search('\[(.*?)\*4\+0x([\dA-F]+)\]', asm)
-      if m:
-        src = m.group(1)
-        switch_start = int(m.group(2), 16)
-        asm = f'switch({src}) {{\n'
-        asm += get_switch_statement(switch_start, 'goto ', 4)
-        asm += '}'
-      else:
-        asm = f'goto {asm}'
+    else:
+      asm = asm.split('.')[-1]
+      try:
+        asm = int(asm, 16)
+        jumps.add(asm)
+        asm = f'goto {to_hex_str(asm)}'
+      except ValueError:
+        m = re.search('\[(.*?)\*4\+0x([\dA-F]+)\]', asm)
+        if m:
+          src = m.group(1)
+          switch_start = int(m.group(2), 16)
+          asm = f'switch({src}) {{\n'
+          asm += get_switch_statement(switch_start, 'goto ', 4)
+          asm += '}'
+        else:
+          asm = f'goto {asm}'
 
     # Code which follows an unconditional jump should not be interpreted, until we reach an instruction which can be jumped to.
     unreachable_code = True
@@ -251,7 +247,7 @@ for line in p.open('r'):
     is_function_stack = True
   elif inst in ['setne', 'sete']:
     asm = f'if ({last_cmp(inst)}) ' + assign(asm, 0x01)
-  elif inst in ['cmovne']:
+  elif inst in ['cmovne', 'cmove', 'cmovg']:
     dst, src = split(asm)
     asm = f'if ({last_cmp(inst)}) ' + assign(dst, src)
   elif inst in ['sar', 'shl', 'sal']:
@@ -274,10 +270,13 @@ for line in p.open('r'):
     note = ''
     try:
       amt = int(src, 16)
-      if amt >= 0x80000000: # Negative number
-        src = -(0x100000000 - amt)
-      elif amt > 0x00100000: # Large number, may indicate multiplication offset. TODO: Just look for a subsequent mul/imul?
-        note = f' // Note: Large value is actually 2^32 / {0x100000000 / amt}'
+      bytes = int.to_bytes(amt, 4, 'little')
+      if amt > 0x30000000 and amt < 0x40000000: # Likely to be a float
+        src = str(bytes_to_float(bytes))
+      else:
+        src = str(bytes_to_int(bytes))
+        if amt > 0x00100000:
+          note = f' // Note: Large value is actually {bytes_to_fraction(bytes)}'
     except ValueError:
       pass
     asm = assign(dst, src) + note
@@ -369,7 +368,7 @@ for line in p.open('r'):
     # amt = int(asm, 16) if asm else 0
     # asm = 'pop\n' * (amt // 4) + 'return'
     # @Assume the compiler knows what it's doing
-    asm = 'return ' + reg_values['eax']
+    asm = 'return ' + reg_values['rax']
     unreachable_code = True
   elif inst == 'int3':
     asm = ''
@@ -395,14 +394,18 @@ for line in p.open('r'):
       # stack.pop()
     asm = ''
   elif inst == 'call':
-    asm = asm.split('.')[-1]
-    try:
-      asm = to_hex_str(int(asm, 16))
-    except ValueError:
-      pass
+    if hex[0] == 0xE8:
+      asm = addr + bytes_to_int(hex[1:]) + len(hex)
+    else:
+      asm = asm.split('.')[-1]
+      try:
+        asm = to_hex_str(int(asm, 16))
+      except ValueError:
+        raise
+
     args = []
     if CALLING_CONVENTION == 'x64 fastcall':
-      args += [reg_values['rcx'] + ' /*rcx*/', reg_values['rdx'] + ' /*rdx*/']
+      args += [reg_values['rcx'] + ' /*rcx*/', reg_values['rdx'] + ' /*rdx*/', reg_values['r8'] + ' /*r8*/', reg_values['r9'] + ' /*r9*/']
     elif CALLING_CONVENTION == 'x86 fastcall':
       args += [reg_values['ecx'] + ' /*ecx*/', reg_values['edx'] + ' /*edx*/']
     elif CALLING_CONVENTION == 'x86 thiscall':
