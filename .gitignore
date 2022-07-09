@@ -19,3 +19,4 @@ tmp
 *.suo
 */Assembly-CSharp/*
 *.vs/
+venv/
