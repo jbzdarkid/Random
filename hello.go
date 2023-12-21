@@ -1,23 +1,22 @@
 package main
 
 import "fmt"
-import "os"
 
 // Maybe just list<solution> and include loc in the soln object?
-var solutions = make(map[string]loc);
+var solutions = make([]soln_flat, 0);
 
 func main() {
   var e1_pieces = make([]*piece, 8);
-  e1_pieces[0] = new_piece('S', loc{3.5, 1},  loc{0.5, 0});
-  e1_pieces[1] = new_piece('O', loc{3, -0.5}, loc{2, 1.5});
-  e1_pieces[2] = new_piece('L', loc{3.5, 1},  loc{0.5, 0});
-  e1_pieces[3] = new_piece('O', loc{2, -1}, loc{3, 2});
-  e1_pieces[4] = new_piece('S', loc{4, 1},  loc{0, 0});
-  e1_pieces[5] = new_piece('L', loc{3, 2},  loc{1, -1});
-  e1_pieces[6] = new_piece('L', loc{3, 2},  loc{0, 0});
-  e1_pieces[7] = new_piece('L', loc{4, 1},  loc{1, 1});
+  e1_pieces[0] = new_piece('S', loc{3, 1, NORTH},  loc{0, 0, NORTH});
+  e1_pieces[1] = new_piece('O', loc{3, 0, EAST},   loc{2, 2, EAST});
+  e1_pieces[2] = new_piece('L', loc{3, 1, NORTH},  loc{0, 0, NORTH});
+  e1_pieces[3] = new_piece('O', loc{2, 0, EAST},   loc{3, 2, EAST});
+  e1_pieces[4] = new_piece('S', loc{3, 1, NORTH},  loc{0, 0, NORTH});
+  e1_pieces[5] = new_piece('L', loc{3, 1, WEST},   loc{1, -1, WEST});
+  e1_pieces[6] = new_piece('L', loc{3, 1, WEST},   loc{0, 0, NORTH});
+  e1_pieces[7] = new_piece('L', loc{3, 1, NORTH},  loc{1, 1, EAST});
 
-  solve_bridge(e1_pieces[0:3], loc{-0.5,0}, loc{-8.5,-1}); // 8 units forward, 1 unit left.
+  solve_bridge(e1_pieces[0:3], loc{0, 0, NORTH}, loc{-9, -1, NORTH}); // 8 units forward, 1 unit left.
 }
 
 func solve_bridge(pieces []*piece, enter loc, exit loc) {
@@ -25,7 +24,7 @@ func solve_bridge(pieces []*piece, enter loc, exit loc) {
   grid := make([][]bool, 100);
   for x := range(grid) { grid[x] = make([]bool, 100); }
   grid[50][50] = true; // Always the enter point (so 0,0 == 50,50)
-  grid[int(50 + exit.x)][int(50 + exit.y)] = true;
+  grid[50 + exit.x][50 + exit.y] = true;
 
   fmt.Println("Building a bridge with these pieces:");
   for _, p := range pieces {
@@ -35,13 +34,16 @@ func solve_bridge(pieces []*piece, enter loc, exit loc) {
   solve_bridge_recursive(
     grid,
     pieces,
-    loc{enter.x+50, enter.y+50}, // position
-    loc{exit.x+50, exit.y+50}, // target
+    loc{enter.x+50, enter.y+50, enter.ori}, // position
     soln{}, // solution buffer
   );
+
+  for i, s := range solutions {
+    fmt.Printf("Solution %d reached location (%d, %d) with pattern: %s\n", i, s.exit.x, s.exit.y, s.name);
+  }
 }
 
-func solve_bridge_recursive(grid [][]bool, pieces []*piece, position loc, target loc, s soln) {
+func solve_bridge_recursive(grid [][]bool, pieces []*piece, position loc, s soln) {
   for i, p := range pieces {
     if p.shape == rune(0) { continue; }
 
@@ -54,68 +56,75 @@ func solve_bridge_recursive(grid [][]bool, pieces []*piece, position loc, target
       if pieces[k].shape != rune(0) { next_piece = pieces[k]; }
     }
 
-    for option := 0; option < 6; option++ {
+    for option := 0; option < 2; option++ {
       flip := (option % 2) == 0;
       flipswap := (option % 6) / 2;
       var source *piece
       if flipswap == 0 { source = nil; }
       if flipswap == 1 { source = prev_piece; }
       if flipswap == 2 { source = next_piece; }
-      q, name := p.transform(flip, source);
 
-      placed := q.place(grid, position);
+      q, name := p.transform(position, flip, source);
+      placed := q.place(grid);
       if placed {
         s.push(name);
 
         pieces[i].shape = rune(0) // Placeholder to indicate that we have placed this shape
-        solve_bridge_recursive(grid, pieces, q.exit, target, s);
+        solve_bridge_recursive(grid, pieces, q.exit, s);
         pieces[i].shape = q.shape;
 
         s.pop();
-        q.unplace(grid, position);
+        q.unplace(grid);
       }
     }
   }
 
-  solutions[s.tostring()] = position
-  os.Exit(0);
+  solutions = append(solutions, s.flatten(position));
 }
 
-// inexplicably there are no dynamic lists. Okay, go.
 type soln struct {
   data  [100]string;
   count int;
   cost  int;
 }
 
-func (s soln) push (val string) {
+func (s *soln) push (val string) {
   s.data[s.count] = val;
   s.count++;
 }
 
-func (s soln) pop () string {
+func (s *soln) pop () string {
   if s.count == 0 { return ""; }
   s.count--;
   return s.data[s.count];
 }
 
-func (s soln) tostring () string {
-  acc := "";
-  for i := 0; i < s.count; i++ {
-    if len(acc) != 0 { acc += ", "; }
-    acc += s.data[i];
-  }
-  return acc;
+type soln_flat struct {
+  name string;
+  exit loc;
+  cost int;
 }
 
-type loc struct { x float64; y float64 }
+func (s *soln) flatten (exit loc) soln_flat {
+  sf := soln_flat{"", exit, s.cost};
+  for i := 0; i < s.count; i++ {
+    if len(sf.name) != 0 { sf.name += ", "; }
+    sf.name += s.data[i];
+  }
+  return sf;
+}
+
+const NORTH = 0;
+const EAST  = 1;
+const SOUTH = 2;
+const WEST  = 3;
+type loc struct { x int; y int; ori int; }
 
 type piece struct {
   shape rune;
   enter loc;
   exit  loc;
   cells [4]loc;
-  ori   int; // 0: North, 1: West, 2: South, 3: East
 };
 
 func new_piece(shape rune, enter loc, exit loc) *piece {
@@ -126,130 +135,131 @@ func new_piece(shape rune, enter loc, exit loc) *piece {
 
   switch p.shape {
   case 'I':
-    p.cells = [4]loc{loc{0, 0}, loc{1, 0}, loc{2, 0}, loc{3, 0}};
+    p.cells = [4]loc{loc{0, 0, 0}, loc{1, 0, 0}, loc{2, 0, 0}, loc{3, 0, 0}};
   case 'L':
-    p.cells = [4]loc{loc{1, 0}, loc{2, 0}, loc{3, 0}, loc{3, 1}};
+    p.cells = [4]loc{loc{1, 0, 0}, loc{2, 0, 0}, loc{3, 0, 0}, loc{3, 1, 0}};
   case 'S':
-    p.cells = [4]loc{loc{1, 0}, loc{2, 0}, loc{2, 1}, loc{3, 1}};
+    p.cells = [4]loc{loc{1, 0, 0}, loc{2, 0, 0}, loc{2, 1, 0}, loc{3, 1, 0}};
   case 'O':
-    p.cells = [4]loc{loc{2, 0}, loc{2, 1}, loc{3, 0}, loc{3, 1}};
+    p.cells = [4]loc{loc{2, 0, 0}, loc{2, 1, 0}, loc{3, 0, 0}, loc{3, 1, 0}};
   case 'T':
-    p.cells = [4]loc{loc{2, 0}, loc{2, 1}, loc{2, 2}, loc{3, 1}};
-  }
-
-  for _, cell := range p.cells {
-    if cell.x == p.enter.x - 0.5 && cell.y == p.enter.y {
-      p.ori = 0; // North
-      break;
-    } else if cell.x == p.enter.x + 0.5 && cell.y == p.enter.y {
-      p.ori = 2; // South
-      break;
-    } else if cell.x == p.enter.x && cell.y == p.enter.y - 0.5 {
-      p.ori = 3; // East
-      break;
-    } else if cell.x == p.enter.x && cell.y == p.enter.y + 0.5 {
-      p.ori = 1; // West
-      break;
-    }
+    p.cells = [4]loc{loc{2, 0, 0}, loc{2, 1, 0}, loc{2, 2, 0}, loc{3, 1, 0}};
   }
 
   return p;
 }
 
-func (p piece) contains (l loc) bool {
+func (p *piece) contains (x int, y int) bool {
   for _, c := range p.cells {
-    if c == l { return true; }
+    if c.x == x && c.y == y { return true; }
   }
   return false;
 }
 
-func (p piece) print() {
-  output := "+----+\n";
-  for x := 0.0; x < 4; x++ {
-    output += "|";
-    for y := 0.0; y < 4; y++ {
-      switch {
-        case !p.contains(loc{x, y}):   output += " ";
-        case p.enter == loc{x-0.5, y}: output += "v";
-        case p.enter == loc{x+0.5, y}: output += "^";
-        case p.enter == loc{x, y-0.5}: output += ">";
-        case p.enter == loc{x, y+0.5}: output += "<";
-        case p.exit  == loc{x-0.5, y}: output += "^";
-        case p.exit  == loc{x+0.5, y}: output += "v";
-        case p.exit  == loc{x, y-0.5}: output += "<";
-        case p.exit  == loc{x, y+0.5}: output += ">";
-        default:                       output += "#";
+func (p *piece) print() {
+  output := "";
+  for x := -1; x < 5; x++ {
+    for y := -1; y < 5; y++ {
+      // For no apparently good reason, you need to have the '} else' together or else go inserts a semicolon for you.
+      // ALSO you need parenthesis around the conditions here. Something about the inline loc{} declaration, I guess.
+      if (p.contains(x, y)) {
+        if (p.enter == loc{x, y, NORTH})   { output += "^"; } else
+        if (p.enter == loc{x, y, SOUTH})   { output += "v"; } else
+        if (p.enter == loc{x, y, WEST})    { output += "<"; } else
+        if (p.enter == loc{x, y, EAST})    { output += ">"; } else
+        if (p.exit  == loc{x-1, y, NORTH}) { output += "^"; } else
+        if (p.exit  == loc{x+1, y, SOUTH}) { output += "v"; } else
+        if (p.exit  == loc{x, y-1, WEST})  { output += "<"; } else
+        if (p.exit  == loc{x, y+1, EAST})  { output += ">"; } else
+                                           { output += "#"; }
+      } else {
+        x_edge := (x == -1 || x == 4);
+        y_edge := (y == -1 || y == 4);
+        if (x_edge && y_edge)              { output += "+"; } else
+        if (x_edge && !y_edge)             { output += "-"; } else
+        if (!x_edge && y_edge)             { output += "|"; } else
+        if (!x_edge && !y_edge)            { output += " "; }
       }
     }
-    output += "|\n";
+    output += "\n";
   }
-  output += "+----+\n";
   fmt.Print(output);
 }
 
 // rotation: Integer, number of 90 degree clockwise rotations.
 func (p *piece) rotate(rotation int) {
+  rotation = ((rotation % 4) + 4) % 4;
   for i := 0; i < rotation; i++ {
-    p.enter = loc{4 - p.enter.y, p.enter.x};
-    p.exit  = loc{4 - p.exit.y,  p.exit.x};
+    p.enter = loc{p.enter.y, 3 - p.enter.x, (p.enter.ori + 1) % 4};
+    p.exit  = loc{p.exit.y,  3 - p.exit.x, (p.exit.ori + 1) % 4};
     for i, cell := range p.cells {
-      p.cells[i] = loc{4 - cell.y, cell.x};
+      p.cells[i] = loc{cell.y, 3 - cell.x, cell.ori};
     }
   }
 }
 
 func (p *piece) flip() {
-  p.enter = loc{3 - p.enter.x, p.enter.y};
-  p.exit  = loc{3 - p.exit.x,  p.exit.y};
+  p.enter = loc{p.enter.x, 3 - p.enter.y, (4 - p.enter.ori) % 4};
+  p.exit  = loc{p.exit.x,  3 - p.exit.y, (4 - p.enter.ori) % 4};
   for i, cell := range p.cells {
-    p.cells[i] = loc{3 - cell.x, cell.y};
+    p.cells[i] = loc{cell.x, 3 - cell.y, cell.ori};
   }
 }
 
-func (p *piece) translate(trans loc) {
-  p.enter = loc{p.enter.x + trans.x, p.enter.y + trans.y};
-  p.exit  = loc{p.exit.x + trans.x,  p.exit.y + trans.y};
+func (p *piece) translate(x int, y int) {
+  p.enter = loc{p.enter.x + x, p.enter.y + y, p.enter.ori};
+  p.exit  = loc{p.exit.x + x,  p.exit.y + y, p.enter.ori};
   for i, cell := range p.cells {
-    p.cells[i] = loc{cell.x + trans.x, cell.y + trans.y};
+    p.cells[i] = loc{cell.x + x, cell.y + y, cell.ori};
   }
 }
 
 /**
  * Rotate, translate, flip, or flipswap a piece (before placing it)
+ * target: Loc, target position and orientiation (within the larger grid).
  * flip: Boolean, if the piece is flipped (or the source piece is flipped, if nonnil
  * source: &Piece, the flipswap source piece. See this video for an explanation.
  *   https://youtu.be/OLKT43q9EYY
  *   Optional value indicated by nil, in which case no flipswap is applied.
 **/
-func (p piece) transform(flip bool, source *piece) (*piece, string) {
+func (p *piece) transform(position loc, flip bool, source *piece) (*piece, string) {
   q := new_piece(p.shape, p.enter, p.exit); // Copy and we'll just modify the copy
 
   if source == nil { // Normal, non-flipswap behavior.
-    q.rotate(q.ori);
-    if flip { q.flip(); }
+    fmt.Printf("Transforming piece %c %s %s\n", q.shape, position, flip);
+    q.print();
+    fmt.Printf("Rotating by %d\n", position.ori - q.enter.ori);
+    q.rotate(position.ori - q.enter.ori);
+    q.print();
+    if flip {
+      fmt.Println("Flipping");
+      q.flip();
+      q.print();
+    }
+    fmt.Printf("Translating by %d, %d\n", 3 - q.enter.x, -q.enter.y);
+    q.translate(3 - q.enter.x, 0 - q.enter.y);
+    q.print();
 
   } else { // Buggy flipswap behavior
+    fmt.Println("flipswap");
     r := new_piece(source.shape, source.enter, source.exit);
-    r.print()
 
     // Green: "Safety" adjustment for S and T (pieces with a hole at (3, 0))
-    if r.shape == 'T' || r.shape == 'S' { r.translate(loc{0, -1}); }
-    r.print()
+    if r.shape == 'T' || r.shape == 'S' { r.translate(0, -1); }
 
     // Red: Apply normal rotation and flip computation for the source piece
-    r.rotate(r.ori);
-    r.print()
+    r.rotate(position.ori - r.enter.ori);
     if flip { r.flip(); }
-    r.print()
+
+    // TODO: Check for validity of *source* piece here.
 
     // Blue: Apply the source rotation and flip to the target piece, then adjust based on the source's entrance
-    q.rotate(r.ori);
-    q.print()
+    q.rotate(position.ori - r.enter.ori);
     if flip { q.flip(); }
-    q.print()
-    q.translate(loc{-r.enter.x, -r.enter.y});
-    q.print()
+    q.translate(3 - r.enter.x, 0 - r.enter.y);
   }
+
+  q.translate(position.x, position.y);
 
   var name string;
   if source != nil && flip  { name = fmt.Sprintf("(%c'%c)", source.shape, p.shape); }
@@ -260,21 +270,24 @@ func (p piece) transform(flip bool, source *piece) (*piece, string) {
   return q, name;
 }
 
-func (p piece) place(grid [][]bool, pos loc) bool {
+func (p *piece) place(grid [][]bool) bool {
   for _, c := range p.cells {
-    if grid[int(c.x + pos.x)][int(c.y + pos.y)] { return false; } // Collides with existing piece
+    if grid[c.x][c.y] {
+      fmt.Printf("Attempted to place piece %c but it collided with the grid at (%d, %d)\n", p.shape, c.x, c.y);
+      return false; // Collides with existing piece
+    }
   }
 
   for _, c := range p.cells {
-    grid[int(c.x + pos.x)][int(c.y + pos.y)] = true;
+    grid[c.x][c.y] = true;
   }
 
   return true;
 }
 
-func (p piece) unplace(grid [][]bool, pos loc) {
+func (p *piece) unplace(grid [][]bool) {
   for _, c := range p.cells {
-    grid[int(c.x + pos.x)][int(c.y + pos.y)] = false;
+    grid[c.x][c.y] = false;
   }
 }
 
