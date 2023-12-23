@@ -50,7 +50,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
       }
       *ch = '\0'; // Terminate the filename
 
-      logFile = CreateFileA(fileName, GENERIC_READ | GENERIC_WRITE, /*dwShareMode=*/NULL, /*lpSecurityAttributes=*/nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, /*hTemplateFile=*/NULL);
+      logFile = CreateFileA(fileName, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, /*lpSecurityAttributes=*/nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, /*hTemplateFile=*/NULL);
       if (logFile == INVALID_HANDLE_VALUE) show_assert("Failed to create/open file '%s' (0x%X). Be sure to use an absolute path.", fileName, GetLastError());
       if (append) SetFilePointer(logFile, 0, 0, FILE_END); // Seek to end of file
 
