@@ -5,12 +5,31 @@
 #include <windows.h>
 #include <crtdbg.h>
 
+// TODO:
+// - executable names do not search the path, they must be fully specified
+// - Task scheduler runs tasks from System32, so relative anything won't work.
+
+#ifdef _DEBUG
 #define show_assert(format, ...) \
   (1 != _CrtDbgReport(_CRT_ASSERT, __FILE__, __LINE__, nullptr, format, ##__VA_ARGS__)) \
   || (__debugbreak(), 0)
+#else
+#define show_assert(format, ...) __debugbreak()
+#endif
 
-// Adapted from https://stackoverflow.com/a/66147288
-int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+DWORD ReadPipe(HANDLE pipe, CHAR* buffer, DWORD bufferSize) {
+  DWORD totalBytesAvail = 0;
+  DWORD bytesRead = 0;
+  PeekNamedPipe(pipe, buffer, bufferSize, &bytesRead, &totalBytesAvail, /*lpBytesLeftThisMessage=*/nullptr);
+  if (totalBytesAvail == 0) return 0; // No data to be read
+
+  // Skip the number of bytes we *read*, not the number of bytes left (we might have more than fit into the buffer)
+  SetFilePointer(pipe, bytesRead, /*lpDistanceToMoveHigh=*/nullptr, FILE_CURRENT);
+
+  return bytesRead; // Should be nonzero.
+}
+
+int __stdcall WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
   HANDLE pipe_out, pipe_in;
 
   SECURITY_ATTRIBUTES attrs = {sizeof(SECURITY_ATTRIBUTES), /*lpSecurityDescriptor=*/nullptr, /*bInheritHandle=*/TRUE};
@@ -27,19 +46,17 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
   HANDLE logFile = NULL;
 
   for (char* ch = lpCmdLine; *ch != '\0'; ++ch) {
+    // Handling basic pipe syntax `>` and `>>`
     if (*ch == '>') {
-      // Separate the command line at the redirection
-
       bool append = false;
-      char* prev = ch - 1;
-      if (*prev == ' ') *prev = '\0';
 
+      // Replace with EOF so that the preceeding text looks like a complete command
+      *ch = '\0';
       ++ch;
-      if (*ch == '>') {append = true; ++ch;}
+      if (*ch == '>') {append = true; ++ch;} // Check for '>>'
+      while (*ch == ' ') ++ch; // Skip whitespace before filename
 
-      while (*ch == ' ') ++ch; // Skip to next argument
-      char* fileName = ch;
-
+      LPSTR fileName = ch;
       if (*ch == '\0') show_assert("Invalid command line: Found EOF while trying to read the redirection filename");
       else if (*ch == '"') {
         fileName++; // Skip the opening "
@@ -61,35 +78,40 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
   PROCESS_INFORMATION pi;
   if (!CreateProcessA(nullptr, lpCmdLine, nullptr, nullptr, /*bInheritHandles=*/TRUE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi)) {
     show_assert("Got error 0x%X when trying to run\n%s", HRESULT_FROM_WIN32(GetLastError()), lpCmdLine);
+    return GetLastError();
   }
 
-  WaitForSingleObject(pi.hProcess, INFINITE);
+  constexpr DWORD bufferSize = 5'000; // 5 KB or so
+  CHAR buffer[bufferSize] = {'\0'};
+  DWORD exitCode = 0;
 
-  // First, check to see if we're at EOF. (otherwise we wait forever in ReadFile)
-  DWORD available = 0;
-  PeekNamedPipe(pipe_out, /*lpBuffer=*/nullptr, /*nBufferSize=*/0, /*lpBytesRead=*/nullptr, &available, /*lpBytesLeftThisMessage=*/nullptr);
-
-  CHAR output[5'000] = {'\0'}; // 5 KB or so
-  DWORD length;
-
-  // Then, if there is data to read, we can actually fetch it.
-  if (available > 0) {
-    BOOL eof = ReadFile(pipe_out, output, sizeof(output) / sizeof(output[0]) - 5, &length, NULL);
-    if (eof == FALSE) {
-      output[++length] = '.';
-      output[++length] = '.';
-      output[++length] = '.';
-    }
-    output[length] = '\0';
-
+  do {
+    // If there's a logfile, read while the process is running
     if (logFile) {
-      WriteFile(logFile, output, length, /*lpNumberOfBytesWritten=*/nullptr, /*lpOverlapped=*/nullptr);
-      CloseHandle(logFile);
+      DWORD bytesRead = 0;
+      while ((bytesRead = ReadPipe(pipe_out, buffer, bufferSize)) > 0) {
+        WriteFile(logFile, buffer, bytesRead, /*lpNumberOfBytesWritten=*/nullptr, /*lpOverlapped=*/nullptr);
+      }
+    }
+
+    WaitForSingleObject(pi.hProcess, /*dwMilliseconds=*/100);
+    GetExitCodeProcess(pi.hProcess, &exitCode);
+  } while (exitCode == STILL_ACTIVE);
+
+  // Read any trailing data (written at/near process end), or read the entire data (if we had no logfile).
+  DWORD bytesRead = 0;
+  while ((bytesRead = ReadPipe(pipe_out, buffer, bufferSize)) > 0) {
+    if (logFile) {
+      WriteFile(logFile, buffer, bytesRead, /*lpNumberOfBytesWritten=*/nullptr, /*lpOverlapped=*/nullptr);
     }
   }
+  if (exitCode != 0) show_assert("Process failed with code %d\n%s", exitCode, buffer);
 
-  DWORD exitCode;
-  GetExitCodeProcess(pi.hProcess, &exitCode);
-  if (exitCode != 0) show_assert("Process failed with code %d\n%s", exitCode, output);
+  // cleanup that's probably not needed
+  if (logFile) CloseHandle(logFile);
+  CloseHandle(pi.hProcess);
+  CloseHandle(pi.hThread);
+  CloseHandle(pipe_in);
+  CloseHandle(pipe_out);
   return exitCode;
 }
