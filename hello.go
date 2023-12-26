@@ -3,11 +3,10 @@ package main
 import "fmt"
 import "sort"
 
-// Maybe just list<solution> and include loc in the soln object?
 var solutions = make([]soln_flat, 0);
 
 func main() {
-  var e1_pieces = make([]*piece, 8);
+  var e1_pieces [8]*piece;
   e1_pieces[0] = new_piece('S', loc{3, 1, NORTH},  loc{0, 0, NORTH});
   e1_pieces[1] = new_piece('O', loc{3, 0, EAST},   loc{2, 2, EAST});
   e1_pieces[2] = new_piece('L', loc{3, 1, NORTH},  loc{0, 0, NORTH});
@@ -16,18 +15,48 @@ func main() {
   e1_pieces[5] = new_piece('L', loc{3, 1, WEST},   loc{1, -1, WEST});
   e1_pieces[6] = new_piece('L', loc{3, 1, WEST},   loc{0, 0, NORTH});
   e1_pieces[7] = new_piece('L', loc{3, 1, NORTH},  loc{1, 1, EAST});
+  // solve_bridge(e1_pieces[0:3], NORTH, loc{-8, -1, NORTH});
+  // solve_bridge(e1_pieces[3:6], NORTH, loc{-7, 2, NORTH});
+  // solve_bridge(e1_pieces[6:8], NORTH, loc{-5, -1, NORTH});
 
-  solve_bridge(e1_pieces[0:3], loc{-1, 0, NORTH}, loc{-9, -1, NORTH}); // 8 units forward, 1 unit left.
+  var e2_pieces [8]*piece;
+  e2_pieces[0] = new_piece('I', loc{3, 0, WEST},  loc{-1, 0, NORTH});
+  e2_pieces[1] = new_piece('T', loc{3, 1, NORTH}, loc{1, 2, NORTH});
+  e2_pieces[2] = new_piece('S', loc{3, 1, NORTH}, loc{-1, 1, WEST});
+  e2_pieces[3] = new_piece('L', loc{3, 1, NORTH}, loc{0, 0, NORTH});
+  e2_pieces[4] = new_piece('I', loc{3, 0, NORTH}, loc{0, 1, EAST});
+  e2_pieces[5] = new_piece('O', loc{3, 0, EAST},  loc{1, 1, NORTH});
+  e2_pieces[6] = new_piece('L', loc{3, 1, WEST},  loc{1, -1, WEST});
+  e2_pieces[7] = new_piece('T', loc{2, 2, WEST},  loc{2, -1, WEST});
+  // solve_bridge(e2_pieces[0:4], NORTH, loc{-8, 0, NORTH});
+  // solve_bridge(e2_pieces[4:8], NORTH, loc{-10, 0, NORTH});
+  
+  var n2_pieces [8]*piece;
+  n2_pieces[0] = new_piece('S', loc{3, 1, NORTH}, loc{0, 0, NORTH});
+  n2_pieces[1] = new_piece('S', loc{3, 1, NORTH}, loc{0, 0, NORTH});
+  n2_pieces[2] = new_piece('L', loc{3, 1, NORTH}, loc{0, 0, NORTH});
+  n2_pieces[3] = new_piece('I', loc{3, 0, WEST},  loc{0, -1, WEST});
+  n2_pieces[4] = new_piece('S', loc{3, 1, NORTH}, loc{0, 0, NORTH});
+  n2_pieces[5] = new_piece('T', loc{3, 1, NORTH}, loc{2, -1, WEST});
+  n2_pieces[6] = new_piece('S', loc{3, 1, NORTH}, loc{1, -1, WEST});
+  n2_pieces[7] = new_piece('L', loc{3, 1, WEST},  loc{1, -1, WEST});
+  // solve_bridge(n2_pieces[0:3], NORTH, loc{-10, 0, NORTH});
+  solve_bridge(n2_pieces[4:7], NORTH, loc{-9, 0, NORTH});
+
+  // s3_pieces = {
+  // }
+  // w2_pieces = {
+  // }
+  
 }
 
-func solve_bridge(pieces []*piece, enter loc, exit loc) {
+func solve_bridge(pieces []*piece, enter_ori int, exit loc) {
   // Large to have scratch space.
   grid := make([][]int, 100);
   for x := range(grid) { grid[x] = make([]int, 100); }
-  grid[50][50] = 1; // Always the enter point (so 0,0 == 50,50)
-  grid[50 + exit.x][50 + exit.y] = 1;
+  grid[51][50] = 1; // The first piece is always at 50,50
 
-  fmt.Println("Building a bridge with these pieces:");
+  print("Building a bridge with these pieces:");
   for _, p := range pieces {
     p.print();
   }
@@ -35,7 +64,8 @@ func solve_bridge(pieces []*piece, enter loc, exit loc) {
   solve_bridge_recursive(
     grid,
     pieces,
-    loc{enter.x+50, enter.y+50, enter.ori}, // position
+    loc{50, 50, enter_ori}, // position
+    loc{exit.x+50, exit.y+50, exit.ori}, // exit
     soln{}, // solution buffer
   );
 
@@ -54,68 +84,76 @@ func solve_bridge(pieces []*piece, enter loc, exit loc) {
   }
 }
 
-func solve_bridge_recursive(grid [][]int, pieces []*piece, position loc, s soln) {
+func solve_bridge_recursive(grid [][]int, pieces []*piece, position loc, exit loc, s soln) {
   for i, p := range pieces {
-    if p.shape == rune(0) { continue; }
+    if p.shape == rune(0) { continue; } // Signal value, piece has already been placed
 
-    for flip := 0; flip < 2; flip++ {
+    for _, flip := range ([]bool {false, true}) {
       // First, try placing the piece normally.
       {
-        q, name := p.transform(position, flip == 1, nil);
+        q := p.transform(position, flip, nil);
         // If this piece does not fit on the grid, then flipswaps won't work either.
         if !q.can_place(grid) { continue; }
 
+        s.add_piece(p, i, flip, nil, grid);
         q.place(grid, +1);
-        s.push(name);
         pieces[i].shape = rune(0); // Placeholder to indicate that we have placed this shape
-        solve_bridge_recursive(grid, pieces, q.exit, s);
+        solve_bridge_recursive(grid, pieces, q.exit, exit, s);
         pieces[i].shape = q.shape;
-        s.pop();
         q.place(grid, -1);
+        s.pop_piece();
       }
 
       // Given that the piece was placable, we can try running a flipswap.
-      prev_i := -1
-      next_i := -1
+      var prev_piece *piece;
+      var next_piece *piece;
       for j := 1; j < len(pieces); j++ {
         k := (i + j) % len(pieces);
-        if pieces[k].shape != rune(0) { prev_i = k; }
+        if pieces[k].shape != rune(0) { prev_piece = pieces[k]; }
         k = (i - j + len(pieces)) % len(pieces);
-        if pieces[k].shape != rune(0) { next_i = k; }
+        if pieces[k].shape != rune(0) { next_piece = pieces[k]; }
       }
-      fmt.Printf("Computed adjacent pieces. i=%d, prev_i=%d, next_i=%d\n", i, prev_i, next_i);
 
       // Flipswap backwards (i.e. target = previous piece)
-      if prev_i != -1 {
-        q, name := pieces[prev_i].transform(position, flip == 1, p);
+      if prev_piece != nil {
+        q := prev_piece.transform(position, flip, p);
         // Flipswaps don't care about target placement safety.
 
+        s.add_piece(p, i, flip, prev_piece, grid);
         q.place(grid, +1);
-        s.push(name);
-        pieces[prev_i].shape = rune(0); // Placeholder to indicate that we have placed this shape
-        solve_bridge_recursive(grid, pieces, q.exit, s);
-        pieces[prev_i].shape = q.shape;
-        s.pop();
+        prev_piece.shape = rune(0); // Placeholder to indicate that we have placed this shape
+        print_grid(grid, q.exit, nil);
+        solve_bridge_recursive(grid, pieces, q.exit, exit, s);
+        prev_piece.shape = q.shape;
         q.place(grid, -1);
+        s.pop_piece();
       }
 
       // Flipswap forwards (i.e. target = next piece)
-      if prev_i != next_i {
-        q, name := pieces[next_i].transform(position, flip == 1, p);
+      if prev_piece != next_piece {
+        q := next_piece.transform(position, flip, p);
         // Flipswaps don't care about target placement safety.
 
+        s.add_piece(p, i, flip, next_piece, grid);
         q.place(grid, +1);
-        s.push(name);
-        pieces[next_i].shape = rune(0); // Placeholder to indicate that we have placed this shape
-        solve_bridge_recursive(grid, pieces, q.exit, s);
-        pieces[next_i].shape = q.shape;
-        s.pop();
+        next_piece.shape = rune(0); // Placeholder to indicate that we have placed this shape
+        print_grid(grid, q.exit, nil);
+        solve_bridge_recursive(grid, pieces, q.exit, exit, s);
+        next_piece.shape = q.shape;
         q.place(grid, -1);
+        s.pop_piece();
       }
     }
   }
 
-  solutions = append(solutions, s.flatten(position));
+  sf := s.flatten(position);
+  solutions = append(solutions, sf);
+  if sf.exit == exit {
+    debug = true;
+    print(sf.name);
+    print_grid(grid, sf.exit, nil);
+    debug = false;
+  }
 }
 
 type soln struct {
@@ -124,15 +162,29 @@ type soln struct {
   cost  int;
 }
 
-func (s *soln) push (val string) {
-  s.data[s.count] = val;
+func (s *soln) add_piece (source *piece, source_i int, flip bool, target *piece, grid [][]int) {
+  var name string;
+  name += fmt.Sprintf("%c%d", source.shape, source_i);
+  if flip { name += "'"; }
+  if target != nil {
+    name = fmt.Sprintf("(%s-%c)", name, target.shape);
+
+    bridge_is_safe := false;
+    switch target.enter.ori {
+      case NORTH: bridge_is_safe = grid[target.enter.x + 1][target.enter.y] > 0;
+      case SOUTH: bridge_is_safe = grid[target.enter.x - 1][target.enter.y] > 0;
+      case EAST:  bridge_is_safe = grid[target.enter.x][target.enter.y + 1] > 0;
+      case WEST:  bridge_is_safe = grid[target.enter.x][target.enter.y - 1] > 0;
+    }
+    if !bridge_is_safe { name = "!" + name; }
+  }
+
+  s.data[s.count] = name;
   s.count++;
 }
 
-func (s *soln) pop () string {
-  if s.count == 0 { return ""; }
-  s.count--;
-  return s.data[s.count];
+func (s *soln) pop_piece () {
+  if s.count > 0 { s.count--; }
 }
 
 type soln_flat struct {
@@ -219,7 +271,7 @@ func (p *piece) print() {
     }
     output += "\n";
   }
-  fmt.Print(output);
+  print(output);
 }
 
 // rotation: Integer, number of 90 degree clockwise rotations.
@@ -258,56 +310,51 @@ func (p *piece) translate(x int, y int) {
  *   https://youtu.be/OLKT43q9EYY
  *   Optional value indicated by nil, in which case no flipswap is applied.
 **/
-func (p *piece) transform(position loc, flip bool, source *piece) (*piece, string) {
+func (p *piece) transform(position loc, flip bool, source *piece) *piece {
   q := new_piece(p.shape, p.enter, p.exit); // Copy and we'll just modify the copy
 
   if source == nil { // Normal, non-flipswap behavior.
     q.rotate(position.ori - q.enter.ori);
     if flip { q.flip(); }
     q.translate(3 - q.enter.x, 0 - q.enter.y);
-
   } else { // Buggy flipswap behavior
-    fmt.Println("flipswapping, source piece:");
+    print("flipswapping, source piece:");
     r := new_piece(source.shape, source.enter, source.exit);
     r.print();
 
-    fmt.Println("Target piece:");
+    print("Target piece:");
     q.print();
+
     // Green: "Safety" adjustment for S and T (pieces with a hole at (3, 0))
-    fmt.Println("green -- shifting source piece");
-    r.print();
+    // TODO: This is probably just a different storage mechanism and I'm being dumb.
+    print("green -- shifting source/target piece.")
+    if q.shape == 'T' || q.shape == 'S' { q.translate(0, -1); }
     if r.shape == 'T' || r.shape == 'S' { r.translate(0, -1); }
 
     // Red: Apply normal rotation and flip computation for the source piece
-    fmt.Println("red -- rotating and flipping source piece");
+    print("red -- rotating and flipping source piece");
     r.rotate(position.ori - source.enter.ori);
     r.print();
     if flip { r.flip(); r.print(); }
 
-    // Blue: Apply the source rotation and flip to the target piece, then adjust based on the source's entrance
-    fmt.Println("blue -- adjusting target based on source adjustment. Initial:");
-    q.print();
+    // Blue: Apply the source transformation to the target piece.
+    print("blue -- adjusting target based on source adjustment");
     q.rotate(position.ori - source.enter.ori);
-    fmt.Println("rotated");
+    print("rotated");
     q.print();
-    if flip { q.flip(); fmt.Println("flipped"); q.print(); }
-    fmt.Printf("Translating by %s\n", r.enter);
+    if flip { q.flip(); print("flipped"); q.print(); }
+    print("translated");
     q.translate(3 - r.enter.x, 0 - r.enter.y);
     q.print();
   }
 
-  q.translate(position.x - 3, position.y - 0); // We are using 3,0 as our entry point (since it makes the pictures look nice.)
+  // Translate to grid coords. We are using 3,0 as our entry point since it makes the pictures look nice.
+  q.translate(position.x - 3, position.y - 0);
 
-  var name string;
-  if source != nil && flip  { name = fmt.Sprintf("(%c'%c)", source.shape, p.shape); }
-  if source != nil && !flip { name = fmt.Sprintf("(%c%c)", source.shape, p.shape); }
-  if source == nil && flip  { name = fmt.Sprintf("%c'", p.shape); }
-  if source == nil && !flip { name = fmt.Sprintf("%c", p.shape); }
-
-  return q, name;
+  return q;
 }
 
-func print_grid(grid [][]int, error loc) {
+func print_grid(grid [][]int, error loc, p *piece) {
   grid_bounds := []int{0, 0, 100, 100};
   for x := 0; x < len(grid); x++ {
     row_clear := true
@@ -352,6 +399,7 @@ func print_grid(grid [][]int, error loc) {
     for y := grid_bounds[2]; y < grid_bounds[3]; y++ {
       if (x == 50 && y == 50)           { output += "S"; } else
       if (x == error.x && y == error.y) { output += "*"; } else
+      if (p != nil && p.contains(x, y)) { output += "X"; } else
       if grid[x][y] == 0                { output += " "; } else
                                         { output += fmt.Sprintf("%d", grid[x][y]); }
     }
@@ -361,18 +409,38 @@ func print_grid(grid [][]int, error loc) {
   for y := grid_bounds[2]; y < grid_bounds[3]; y++ {
     output += "-";
   }
-  output += "+\n";
-  fmt.Print(output);
+  output += "+";
+  print(output);
+}
+
+var debug bool = false
+func print(args ...interface{}) {
+  if debug { fmt.Println(args); }
 }
 
 func (p *piece) can_place(grid [][]int) bool {
+  walkable := false
   for _, c := range p.cells {
     if grid[c.x][c.y] > 0 {
-      fmt.Printf("Attempted to place piece %c but it collided with the grid at (%d, %d)\n", p.shape, c.x, c.y);
-      print_grid(grid, c);
-
-      return false; // Collides with existing piece
+      print("Attempted to place a piece but it collided with the grid");
+      print_grid(grid, c, p);
+      return false;
     }
+
+    walkable = walkable || (grid[c.x-1][c.y-1] > 0);
+    walkable = walkable || (grid[c.x-1][c.y  ] > 0);
+    walkable = walkable || (grid[c.x-1][c.y+1] > 0);
+    walkable = walkable || (grid[c.x  ][c.y-1] > 0);
+    walkable = walkable || (grid[c.x  ][c.y+1] > 0);
+    walkable = walkable || (grid[c.x+1][c.y-1] > 0);
+    walkable = walkable || (grid[c.x+1][c.y  ] > 0);
+    walkable = walkable || (grid[c.x+1][c.y+1] > 0);
+  }
+
+  if !walkable {
+    print("Attempted to place a piece but it cannot be walked onto");
+    print_grid(grid, p.enter, p);
+    return false;
   }
 
   return true;
