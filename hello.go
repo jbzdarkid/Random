@@ -3,8 +3,6 @@ package main
 import "fmt"
 import "sort"
 
-var solutions = make([]soln_flat, 0);
-
 func main() {
   var e1_pieces [8]*piece;
   e1_pieces[0] = new_piece('S', loc{3, 1, NORTH},  loc{0, 0, NORTH});
@@ -41,14 +39,32 @@ func main() {
   n2_pieces[6] = new_piece('S', loc{3, 1, NORTH}, loc{1, -1, WEST});
   n2_pieces[7] = new_piece('L', loc{3, 1, WEST},  loc{1, -1, WEST});
   // solve_bridge(n2_pieces[0:3], NORTH, loc{-10, 0, NORTH});
-  solve_bridge(n2_pieces[4:7], NORTH, loc{-9, 0, NORTH});
+  // solve_bridge(n2_pieces[4:7], NORTH, loc{-9, 0, NORTH});
+  solve_bridge_reverse(n2_pieces[1:4], NORTH, loc{-10, 0, NORTH});
+  // solve_bridge_reverse(n2_pieces[4:8], NORTH, loc{-9, 0, NORTH});
 
   // s3_pieces = {
   // }
   // w2_pieces = {
   // }
-  
+
+
+  sort.Slice(solutions, func(i int, j int) bool {
+    if solutions[i].exit.x < solutions[j].exit.x { return true; }
+    if solutions[i].exit.x > solutions[j].exit.x { return false; }
+
+    if solutions[i].exit.y < solutions[j].exit.y { return true; }
+    if solutions[i].exit.y > solutions[j].exit.y { return false; }
+
+    return false;
+  });
+
+  for i, s := range solutions {
+    fmt.Printf("Solution %d reached location (%d, %d) with pattern: %s\n", i, s.exit.x, s.exit.y, s.name);
+  }
 }
+
+var solutions = make([]soln_flat, 0);
 
 func solve_bridge(pieces []*piece, enter_ori int, exit loc) {
   // Large to have scratch space.
@@ -68,20 +84,47 @@ func solve_bridge(pieces []*piece, enter_ori int, exit loc) {
     loc{exit.x+50, exit.y+50, exit.ori}, // exit
     soln{}, // solution buffer
   );
+}
 
-  sort.Slice(solutions, func(i int, j int) bool {
-    if solutions[i].exit.x < solutions[j].exit.x { return true; }
-    if solutions[i].exit.x > solutions[j].exit.x { return false; }
+func solve_bridge_reverse(pieces []*piece, enter_ori int, exit loc) {
+  // Large to have scratch space.
+  grid := make([][]int, 100);
+  for x := range(grid) { grid[x] = make([]int, 100); }
+  grid[51][50] = 1; // The first piece is always at 50,50
 
-    if solutions[i].exit.y < solutions[j].exit.y { return true; }
-    if solutions[i].exit.y > solutions[j].exit.y { return false; }
-
-    return false;
-  });
-
-  for i, s := range solutions {
-    fmt.Printf("Solution %d reached location (%d, %d) with pattern: %s\n", i, s.exit.x, s.exit.y, s.name);
+  reversed_pieces := make([]*piece, len(pieces));
+  for i, p := range pieces {
+    q := new_piece(p.shape, p.enter, p.exit);
+    switch p.enter.ori {
+      case NORTH: q.exit = loc{p.enter.x + 1, p.enter.y, SOUTH};
+      case SOUTH: q.exit = loc{p.enter.x - 1, p.enter.y, NORTH};
+      case EAST:  q.exit = loc{p.enter.x, p.enter.y - 1, WEST};
+      case WEST:  q.exit = loc{p.enter.x, p.enter.y + 1, EAST};
+    }
+    switch p.exit.ori {
+      case NORTH: q.enter = loc{p.exit.x + 1, p.exit.y, SOUTH};
+      case SOUTH: q.enter = loc{p.exit.x - 1, p.exit.y, NORTH};
+      case EAST:  q.enter = loc{p.exit.x, p.exit.y - 1, WEST};
+      case WEST:  q.enter = loc{p.exit.x, p.exit.y + 1, EAST};
+    }
+    
+    reversed_pieces[len(pieces) - i - 1] = q;
   }
+  
+  debug = true;
+  print("Building a bridge with these pieces:");
+  for _, p := range reversed_pieces {
+    p.print();
+  }
+  debug = false;
+
+  solve_bridge_recursive(
+    grid,
+    reversed_pieces,
+    loc{50, 50, enter_ori}, // position
+    loc{50 + exit.x, 50 + exit.y, exit.ori}, // exit
+    soln{}, // solution buffer
+  );
 }
 
 func solve_bridge_recursive(grid [][]int, pieces []*piece, position loc, exit loc, s soln) {
@@ -177,13 +220,10 @@ func (s *soln) add_piece (source *piece, source_i int, flip bool, target *piece,
     switch target.enter.ori {
       case NORTH: bridge_is_safe = grid[target.enter.x + 1][target.enter.y] > 0;
       case SOUTH: bridge_is_safe = grid[target.enter.x - 1][target.enter.y] > 0;
-      case EAST:  bridge_is_safe = grid[target.enter.x][target.enter.y + 1] > 0;
-      case WEST:  bridge_is_safe = grid[target.enter.x][target.enter.y - 1] > 0;
+      case EAST:  bridge_is_safe = grid[target.enter.x][target.enter.y - 1] > 0;
+      case WEST:  bridge_is_safe = grid[target.enter.x][target.enter.y + 1] > 0;
     }
-    if !bridge_is_safe {
-      name = "!" + name;
-      print_grid(grid, target.enter, target);
-    }
+    if !bridge_is_safe { name = "!" + name; }
   }
 
   s.data[s.count] = name;
@@ -325,34 +365,34 @@ func (p *piece) transform(position loc, flip bool, source *piece) *piece {
     if flip { q.flip(); }
     q.translate(3 - q.enter.x, 0 - q.enter.y);
   } else { // Buggy flipswap behavior
-    print("flipswapping, source piece:");
+    // print("flipswapping, source piece:");
     r := new_piece(source.shape, source.enter, source.exit);
-    r.print();
+    // r.print();
 
-    print("Target piece:");
-    q.print();
+    // print("Target piece:");
+    // q.print();
 
     // Green: "Safety" adjustment for S and T (pieces with a hole at (3, 0))
     // TODO: This is probably just a different storage mechanism and I'm being dumb.
-    print("green -- shifting source/target piece.")
+    // print("green -- shifting source/target piece.")
     if q.shape == 'T' || q.shape == 'S' { q.translate(0, -1); }
     if r.shape == 'T' || r.shape == 'S' { r.translate(0, -1); }
 
     // Red: Apply normal rotation and flip computation for the source piece
-    print("red -- rotating and flipping source piece");
+    // print("red -- rotating and flipping source piece");
     r.rotate(position.ori - source.enter.ori);
-    r.print();
-    if flip { r.flip(); r.print(); }
+    // r.print();
+    if flip { r.flip(); /*r.print();*/ }
 
     // Blue: Apply the source transformation to the target piece.
-    print("blue -- adjusting target based on source adjustment");
+    // print("blue -- adjusting target based on source adjustment");
     q.rotate(position.ori - source.enter.ori);
-    print("rotated");
+    // print("rotated");
     q.print();
-    if flip { q.flip(); print("flipped"); q.print(); }
-    print("translated");
+    if flip { q.flip(); /*print("flipped"); q.print();*/ }
+    // print("translated");
     q.translate(3 - r.enter.x, 0 - r.enter.y);
-    q.print();
+    // q.print();
   }
 
   // Translate to grid coords. We are using 3,0 as our entry point since it makes the pictures look nice.
@@ -423,7 +463,8 @@ func print_grid(grid [][]int, error loc, p *piece) {
 
 var debug bool = false
 func print(args ...interface{}) {
-  if debug { fmt.Println(args); }
+  if !debug { return; }
+  fmt.Println(args...);
 }
 
 func (p *piece) can_place(grid [][]int) bool {
