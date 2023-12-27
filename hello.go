@@ -40,13 +40,19 @@ func main() {
   n2_pieces[7] = new_piece('L', loc{3, 1, WEST},  loc{1, -1, WEST});
   // solve_bridge(n2_pieces[0:3], NORTH, loc{-10, 0, NORTH});
   // solve_bridge(n2_pieces[4:7], NORTH, loc{-9, 0, NORTH});
-  solve_bridge_reverse(n2_pieces[1:4], NORTH, loc{-10, 0, NORTH});
+  // solve_bridge_reverse(n2_pieces[1:4], NORTH, loc{-10, 0, NORTH});
   // solve_bridge_reverse(n2_pieces[4:8], NORTH, loc{-9, 0, NORTH});
 
-  // s3_pieces = {
-  // }
-  // w2_pieces = {
-  // }
+  var s3_pieces [8]*piece;
+  s3_pieces[0] = new_piece('S', loc{3, 1, NORTH}, loc{1, -1, WEST});
+  s3_pieces[1] = new_piece('I', loc{3, 0, NORTH}, loc{0, 1, EAST});
+  s3_pieces[2] = new_piece('O', loc{2, 1, WEST},  loc{3, -1, WEST});
+  s3_pieces[3] = new_piece('I', loc{0, 0, EAST},  loc{4, 0, SOUTH});
+  s3_pieces[4] = new_piece('O', loc{4, 0, NORTH}, loc{3, -1, WEST});
+  s3_pieces[5] = new_piece('L', loc{0, 1, WEST},  loc{3, 2, EAST});
+  s3_pieces[6] = new_piece('L', loc{1, 0, EAST},  loc{3, 2, EAST});
+  s3_pieces[7] = new_piece('O', loc{3, 1, WEST},  loc{1, 0, NORTH});
+  solve_bridge(s3_pieces[0:4], WEST, loc{-8, 0, NORTH});
 
 
   sort.Slice(solutions, func(i int, j int) bool {
@@ -70,17 +76,27 @@ func solve_bridge(pieces []*piece, enter_ori int, exit loc) {
   // Large to have scratch space.
   grid := make([][]int, 100);
   for x := range(grid) { grid[x] = make([]int, 100); }
-  grid[51][50] = 1; // The first piece is always at 50,50
 
+  grid[50][50] = 1; // Initial bridge segment
+  var position loc;
+  switch enter_ori { // Set the starting position relative to the initial ori
+    case NORTH: position = loc{49, 50, NORTH};
+    case SOUTH: position = loc{51, 50, SOUTH};
+    case EAST:  position = loc{50, 51, EAST};
+    case WEST:  position = loc{50, 49, WEST};
+  }
+
+  debug = true
   print("Building a bridge with these pieces:");
   for _, p := range pieces {
     p.print();
   }
+  debug = false
 
   solve_bridge_recursive(
     grid,
     pieces,
-    loc{50, 50, enter_ori}, // position
+    position,
     loc{exit.x+50, exit.y+50, exit.ori}, // exit
     soln{}, // solution buffer
   );
@@ -194,8 +210,10 @@ func solve_bridge_recursive(grid [][]int, pieces []*piece, position loc, exit lo
   }
 
   sf := s.flatten(position);
-  solutions = append(solutions, sf);
-  if sf.exit == exit {
+  if sf.exit.x < 45 {
+    solutions = append(solutions, sf);
+  // if len(solutions) < 100 {
+  // if sf.exit == exit {
     debug = true;
     print(sf.name);
     print_grid(grid, sf.exit, nil);
@@ -445,7 +463,7 @@ func print_grid(grid [][]int, error loc, p *piece) {
   for x := grid_bounds[0]; x < grid_bounds[1]; x++ {
     output += "|";
     for y := grid_bounds[2]; y < grid_bounds[3]; y++ {
-      if (x == 51 && y == 50)           { output += "S"; } else
+      if (x == 50 && y == 50)           { output += "S"; } else
       if (x == error.x && y == error.y) { output += "*"; } else
       if (p != nil && p.contains(x, y)) { output += "X"; } else
       if grid[x][y] == 0                { output += " "; } else
