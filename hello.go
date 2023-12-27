@@ -118,8 +118,10 @@ func solve_bridge_recursive(grid [][]int, pieces []*piece, position loc, exit lo
       if prev_piece != nil {
         q := prev_piece.transform(position, flip, p);
         // Flipswaps don't care about target placement safety.
+        // However, we do care that the pathway is still walkable.
+        if !q.can_walk(grid) { continue; }
 
-        s.add_piece(p, i, flip, prev_piece, grid);
+        s.add_piece(p, i, flip, q, grid);
         q.place(grid, +1);
         prev_piece.shape = rune(0); // Placeholder to indicate that we have placed this shape
         print_grid(grid, q.exit, nil);
@@ -133,8 +135,10 @@ func solve_bridge_recursive(grid [][]int, pieces []*piece, position loc, exit lo
       if prev_piece != next_piece {
         q := next_piece.transform(position, flip, p);
         // Flipswaps don't care about target placement safety.
+        // However, we do care that the pathway is still walkable.
+        if !q.can_walk(grid) { continue; }
 
-        s.add_piece(p, i, flip, next_piece, grid);
+        s.add_piece(p, i, flip, q, grid);
         q.place(grid, +1);
         next_piece.shape = rune(0); // Placeholder to indicate that we have placed this shape
         print_grid(grid, q.exit, nil);
@@ -176,7 +180,10 @@ func (s *soln) add_piece (source *piece, source_i int, flip bool, target *piece,
       case EAST:  bridge_is_safe = grid[target.enter.x][target.enter.y + 1] > 0;
       case WEST:  bridge_is_safe = grid[target.enter.x][target.enter.y - 1] > 0;
     }
-    if !bridge_is_safe { name = "!" + name; }
+    if !bridge_is_safe {
+      name = "!" + name;
+      print_grid(grid, target.enter, target);
+    }
   }
 
   s.data[s.count] = name;
@@ -356,13 +363,14 @@ func (p *piece) transform(position loc, flip bool, source *piece) *piece {
 
 func print_grid(grid [][]int, error loc, p *piece) {
   grid_bounds := []int{0, 0, 100, 100};
+  fudge := 5
   for x := 0; x < len(grid); x++ {
     row_clear := true
     for y := 0; y < len(grid[x]); y++ {
       if grid[x][y] > 0 { row_clear = false; break; }
     }
     if !row_clear { break; }
-    grid_bounds[0] = x;
+    grid_bounds[0] = x - fudge;
   }
   for x := len(grid) - 1; x >= 0; x-- {
     row_clear := true
@@ -370,7 +378,7 @@ func print_grid(grid [][]int, error loc, p *piece) {
       if grid[x][y] > 0 { row_clear = false; break; }
     }
     if !row_clear { break; }
-    grid_bounds[1] = x;
+    grid_bounds[1] = x + fudge;
   }
   for y := 0; y < len(grid[0]); y++ {
     col_clear := true
@@ -378,7 +386,7 @@ func print_grid(grid [][]int, error loc, p *piece) {
       if grid[x][y] > 0 { col_clear = false; break; }
     }
     if !col_clear { break; }
-    grid_bounds[2] = y;
+    grid_bounds[2] = y - fudge;
   }
   for y := len(grid[0]) - 1; y >= 0; y-- {
     col_clear := true
@@ -386,7 +394,7 @@ func print_grid(grid [][]int, error loc, p *piece) {
       if grid[x][y] > 0 { col_clear = false; break; }
     }
     if !col_clear { break; }
-    grid_bounds[3] = y;
+    grid_bounds[3] = y + fudge;
   }
 
   output := "+";
@@ -397,7 +405,7 @@ func print_grid(grid [][]int, error loc, p *piece) {
   for x := grid_bounds[0]; x < grid_bounds[1]; x++ {
     output += "|";
     for y := grid_bounds[2]; y < grid_bounds[3]; y++ {
-      if (x == 50 && y == 50)           { output += "S"; } else
+      if (x == 51 && y == 50)           { output += "S"; } else
       if (x == error.x && y == error.y) { output += "*"; } else
       if (p != nil && p.contains(x, y)) { output += "X"; } else
       if grid[x][y] == 0                { output += " "; } else
@@ -419,14 +427,20 @@ func print(args ...interface{}) {
 }
 
 func (p *piece) can_place(grid [][]int) bool {
-  walkable := false
   for _, c := range p.cells {
     if grid[c.x][c.y] > 0 {
       print("Attempted to place a piece but it collided with the grid");
       print_grid(grid, c, p);
       return false;
     }
+  }
 
+  return true;
+}
+
+func (p *piece) can_walk(grid [][]int) bool {
+  walkable := false
+  for _, c := range p.cells {
     walkable = walkable || (grid[c.x-1][c.y-1] > 0);
     walkable = walkable || (grid[c.x-1][c.y  ] > 0);
     walkable = walkable || (grid[c.x-1][c.y+1] > 0);
