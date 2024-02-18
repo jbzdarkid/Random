@@ -71,13 +71,13 @@ def decode_decklist(decklist):
   doubletons = read_array(stream)
   
   cards = singletons + doubletons + doubletons
-  cards.sort()
-  
-  return {
-    'format': ['unknown', 'wild', 'standard', 'classic', 'twist'][deck_format],
-    'hero': heroes[0],
-    'cards': cards,
-  }
+  normalized_cards = normalize_deck(cards)
+  normalized_cards.sort()
+
+  for i, card in enumerate(normalized_cards):
+    print(f'Card {i+1:<2}: {card:<5} {cardlist[card]}')
+
+  return normalized_cards
 
 # Simulate C++/C# truncation
 def trunc(val, bits=64):
@@ -86,18 +86,16 @@ def trunc(val, bits=64):
     return val - (2 ** bits)
   return val
 
-def hash_deck(cards):
-  # First, we must normalize the cards:
+def normalize_deck(cards):
   normalized_cards = []
   for card in cards:
     card_variants = [k for k, v in cardlist.items() if v == cardlist[card]]
     normalized_cards.append(min(card_variants))
 
   normalized_cards.sort()
+  return normalized_cards
 
-  for i, card in enumerate(normalized_cards):
-    print(f'Card {i+1:<2}: {card:<5} {cardlist[card]}')
-
+def hash_deck(cards):
   # Then we can go about the hash computation.
   hash = 0
   for card in normalized_cards:
@@ -106,8 +104,12 @@ def hash_deck(cards):
 
 decklist = decode_decklist('AAEBAaoIDLSKBLaKBKyfBNugBOCgBJbUBKDUBKnUBPzbBMviBJakBfCuBQmf1ASo2QS12QT03ASz3QS14gSl5ATF7QTK7QQA')
 
-# cards = [68441, 69723, 46667, 66868, 66870, 69728, 76310, 76319, 76319, 76320, 76329, 76968, 76968, 76981, 76981, 77308, 77428, 77428, 77491, 77491, 78133, 78133, 78155, 78373, 78373, 79557, 79557, 79562, 79562, 87920]
-expected_hash = -8433254302802380797
+print(hash_deck(decklist))
+print('Expected hash: -8433254302802380797')
 
-print(hash_deck(decklist['cards']))
-print(expected_hash)
+
+
+unknown_hash = 4901740154402535512 # For the new deck code :)
+
+
+# Okay, now we get to do the hard thing. What if we had the hash of everything *but* the final card in the decklist, and we had to figure it out *mathematically*?
