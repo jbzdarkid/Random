@@ -1,32 +1,19 @@
 from pathlib import Path
 import json
 
-"""
-out = Path('C:\\Users\\localhost\\Downloads\\out')
-data = []
-for p in out.iterdir():
-  hash = p.name
-  card_id = p.open('r').read()
-  time = p.stat().st_mtime
-  data.append([time, card_id, hash])
-  
-data.sort()
-for d in data:
-  print(d)
-exit()
-"""
-
 try:
   cards_file = Path('cards.json')
   cardlist = json.load(cards_file.open('r', encoding='utf-8'))
-  for k, v in cardlist:
+  for k, v in list(cardlist.items()):
+    del cardlist[k]
     cardlist[int(k)] = v
-except:
-  # import requests
-  # r = requests.get('https://api.hearthstonejson.com/v1/latest/all/cards.collectible.json')
-  
-  with Path('cards.collectible.json').open('r', encoding='utf-8') as f:
-    j = json.load(f)
+except Exception as e:
+  print(e)
+  import requests
+  r = requests.get('https://api.hearthstonejson.com/v1/latest/all/cards.collectible.json')
+  j = r.json()
+  with Path('cards.collectible.json').open('w', encoding='utf-8') as f:
+    json.dump(j, f)
   
   cardlist = {}
   for card in j:
@@ -95,16 +82,18 @@ def normalize_deck(cards):
   normalized_cards.sort()
   return normalized_cards
 
+def hash_step(hash, card):
+    return hash ^ trunc(card + 2654435769 + (hash << 6) + (hash >> 2))
+
 def hash_deck(cards):
-  # Then we can go about the hash computation.
   hash = 0
-  for card in normalized_cards:
-    hash ^= trunc(card + 2654435769 + (hash << 6) + (hash >> 2))
+  for card in cards:
+    hash = hash_step(hash, card)
   return hash
 
 decklist = decode_decklist('AAEBAaoIDLSKBLaKBKyfBNugBOCgBJbUBKDUBKnUBPzbBMviBJakBfCuBQmf1ASo2QS12QT03ASz3QS14gSl5ATF7QTK7QQA')
 
-print(hash_deck(decklist))
+# print(hash_deck(decklist))
 print('Expected hash: -8433254302802380797')
 
 
@@ -112,4 +101,20 @@ print('Expected hash: -8433254302802380797')
 unknown_hash = 4901740154402535512 # For the new deck code :)
 
 
-# Okay, now we get to do the hard thing. What if we had the hash of everything *but* the final card in the decklist, and we had to figure it out *mathematically*?
+
+
+def bits(x):
+  str = bin(x).replace('0b', '')[-16:]
+  return '0' * (16 - len(str)) + str
+
+import random
+for i in range(10):
+  print('Attempt', i+1)
+  x = random.randint(2 ** 15, 2 ** 16)
+  y = trunc(x ^ ((x >> 2) + (x << 6)))
+  print('2', bits(x >> 2))
+  print('6', bits(x << 6))
+  print('4', bits((x >> 2) + (x << 6)))
+  print('X', bits(x))
+  print('Y', bits(y))
+
