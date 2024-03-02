@@ -82,13 +82,13 @@ def normalize_deck(cards):
   normalized_cards.sort()
   return normalized_cards
 
-def hash_step(hash, card):
-    return hash ^ trunc(card + 2654435769 + (hash << 6) + (hash >> 2))
+def bad_hash(x, val=0):
+  return x ^ (val + 2654435769 + (x << 6) + (x >> 2))
 
 def hash_deck(cards):
   hash = 0
   for card in cards:
-    hash = hash_step(hash, card)
+    hash = trunc(bad_hash(hash, card))
   return hash
 
 decklist = decode_decklist('AAEBAaoIDLSKBLaKBKyfBNugBOCgBJbUBKDUBKnUBPzbBMviBJakBfCuBQmf1ASo2QS12QT03ASz3QS14gSl5ATF7QTK7QQA')
@@ -96,43 +96,47 @@ decklist = decode_decklist('AAEBAaoIDLSKBLaKBKyfBNugBOCgBJbUBKDUBKnUBPzbBMviBJak
 print('Actual hash:  ', hash_deck(decklist))
 print('Expected hash: -8433254302802380797')
 
+def bits(x, bits=64):
+  if x & (2 ** (bits - 1)): # Adjust for sign
+    x = x + (2 ** bits)
+  str = bin(x).replace('0b', '')[-bits:]
+  return '0' * (bits - len(str)) + str
+print(bits(-8433254302802380797))
+print(trunc(0b1000101011110111000011111110010010010100111011011111100000000011))
 
 
 unknown_hash = 4901740154402535512 # For the new deck code :)
 
-
-
-
-def bits(x):
-  str = bin(x).replace('0b', '')[-16:]
-  return '0' * (16 - len(str)) + str
-
-def bad_hash(x):
-  return x ^ ((x >> 2) + (x << 6))
-
-import random
-random.seed(42) # For ease of testing/stability
-for i in range(10):
-  print('-'*10, 'Attempt', i+1)
-  x = random.randint(2 ** 15, 2 ** 16)
-  y = trunc(bad_hash(x))
-
+def reverse_hash(y, val):
   # We don't have any real data about the first two bits, but usually they will trial-and-error away.
   for initial_guess in [0b00, 0b01, 0b10, 0b11]:
     guess = initial_guess
-    for j in range(2, 16):
+    for j in range(2, 64):
       mask = (1 << (j - 1)) - 1
       bit = 1 << j
 
       # TODO: Is it ever possible for both to be true?
-      if (bad_hash(guess) & mask) == (y & mask):
+      if (bad_hash(guess, val) & mask) == (y & mask):
         continue
-      elif (bad_hash(guess | bit) & mask) == (y & mask):
+      elif (bad_hash(guess | bit, val) & mask) == (y & mask):
         guess |= bit
         continue
       break
-    if bad_hash(guess) != y:
-      continue # Double check in case we exited early (and also for high bits)
-    print('Guessed x', bits(guess))
-  print('Actual x ', bits(x))
+    # Double check in case we exited early (also verifies the high 2 bits)
+    if bad_hash(guess, val) != y:
+      continue
+    return guess
+  return None
 
+
+"""
+import random
+for i in range(100):
+  print('-'*10, 'Attempt', i+1)
+  x = random.randint(2 ** 63, 2 ** 64)
+  y = bad_hash(x, 123)
+  guess = reverse_hash(y, 123)
+  print('Guessed x', bits(guess))
+  print('Actual x ', bits(x))
+  
+"""
