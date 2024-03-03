@@ -91,21 +91,19 @@ def hash_deck(cards):
     hash = trunc(bad_hash(hash, card))
   return hash
 
+unknown_hash = 4901740154402535512 # For the new deck code :)
+
 decklist = decode_decklist('AAEBAaoIDLSKBLaKBKyfBNugBOCgBJbUBKDUBKnUBPzbBMviBJakBfCuBQmf1ASo2QS12QT03ASz3QS14gSl5ATF7QTK7QQA')
 
 print('Actual hash:  ', hash_deck(decklist))
 print('Expected hash: -8433254302802380797')
 
 def bits(x, bits=64):
-  if x & (2 ** (bits - 1)): # Adjust for sign
-    x = x + (2 ** bits)
+  if x & (1 << (bits - 1)): # Adjust for sign
+    x = x + (1 << bits)
   str = bin(x).replace('0b', '')[-bits:]
   return '0' * (bits - len(str)) + str
-print(bits(-8433254302802380797))
-print(trunc(0b1000101011110111000011111110010010010100111011011111100000000011))
 
-
-unknown_hash = 4901740154402535512 # For the new deck code :)
 
 def reverse_hash(y, val):
   # We don't have any real data about the first two bits, but usually they will trial-and-error away.
@@ -115,7 +113,6 @@ def reverse_hash(y, val):
       mask = (1 << (j - 1)) - 1
       bit = 1 << j
 
-      # TODO: Is it ever possible for both to be true?
       if (bad_hash(guess, val) & mask) == (y & mask):
         continue
       elif (bad_hash(guess | bit, val) & mask) == (y & mask):
@@ -134,9 +131,35 @@ import random
 for i in range(100):
   print('-'*10, 'Attempt', i+1)
   x = random.randint(2 ** 63, 2 ** 64)
-  y = bad_hash(x, 123)
-  guess = reverse_hash(y, 123)
+  v = random.randint(1, 1000)
+  y = bad_hash(x, v)
+  guess = reverse_hash(y, v)
   print('Guessed x', bits(guess))
   print('Actual x ', bits(x))
-  
+  assert(guess == x)
 """
+
+print('Something bad happening')
+x = 191242499615597045949
+y = 12106176445390699504078
+
+print(bad_hash(x, 46667))
+print(y)
+
+x2 = reverse_hash(y, 46667)
+print(x2)
+exit()
+
+
+hash = 0
+for i, card in enumerate(decklist):
+  print('-'*50, 'i', i)
+  print('pre hash', hash)
+  print('card', card)
+  hash = bad_hash(hash, card)
+  print('post hash', hash)
+  rhash = reverse_hash(hash, card)
+  print('rhash', rhash)
+  assert rhash is not None
+  print('rebuild', bad_hash(rhash, card))
+  
