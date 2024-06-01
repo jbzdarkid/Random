@@ -1,10 +1,21 @@
-﻿using System.Text;
+﻿using System.Diagnostics;
+using System.Text;
+
+namespace DeadRinger;
 
 public static class Global {
     public static List<Bell> bells = [];
     public static List<Enemy> enemies = [];
     public static int beat = 0;
-    public static DeadRinger DeadRinger = new(0, 0, null);
+    public static DeadRinger DeadRinger = new(-1, -1, null);
+
+    public static int width = 11;
+    public static int height = 10;
+    public static bool IsOob(int x, int y) {
+        if (y < 0 || y >= width || x < 0) return true;
+        if (Player.x == height) return x == height && (y < 4 || y > 6);
+        return x >= height;
+    }
 
     public static Bell? OccupiedByBell(int x, int y) =>
         bells.Find(bell => bell.x == x && bell.y == y);
@@ -17,21 +28,16 @@ public static class Global {
     public static bool OccupiedByPlayer(int x, int y) =>
         x == Player.x && y == Player.y;
 
-    public static bool IsOob(int x, int y) {
-        if (y < 0 || y > 10 || x < 0) return true;
-        if (Player.x == 10) return x == 10 && (y < 4 || y > 6);
-        return x > 9;
-    }
 
     public static (int, int) RandomLocation() {
-        return (1, 1);
+        return (1, 1); // TODO.
     }
 }
 
 public static class Program {
     public static void Init() {
         Global.bells = [
-            new(3, 2, (x, y) => new Dragon(x, y)),
+            new(3, 2, (x, y) => new Dragon(x, y, delay: 0)),
             new(3, 8, (x, y) => new Ogre(x, y)),
             new(8, 2, (x, y) => new Nightmare(x, y)),
             new(8, 8, (x, y) => new Minotaur(x, y)),
@@ -46,34 +52,51 @@ public static class Program {
     }
 
     public static void DrawGrid() {
-        StringBuilder output = new("+-----------+\n");
-        for (int x = 0; x < 10; x++) {
+        StringBuilder output = new("+" + new string('-', Global.width) + "+\n");
+        for (int x = 0; x < Global.height; x++) {
             output.Append('|');
-            for (int y = 0; y < 11; y++) {
+            for (int y = 0; y < Global.width; y++) {
                 var bell = Global.OccupiedByBell(x, y);
                 var enemy = Global.OccupiedByEnemy(x, y);
                 if (bell != null) output.Append(bell.rung ? 'B' : 'b');
-                else if (enemy != null) output.Append(char.ToLowerInvariant(enemy.GetType().FullName?[0] ?? '?'));
+                else if (enemy != null) output.Append(char.ToLowerInvariant(enemy.GetType().Name?[0] ?? '?'));
                 else if (Global.OccupiedByPlayer(x, y)) output.Append('P');
                 else if (Global.OccupiedByDeadRinger(x, y)) output.Append('D');
                 else output.Append(' ');
             }
             output.Append("|\n");
         }
-        if (Player.x == 10) {
+        if (Player.x == Global.height) {
             output.Append("+----");
             for (int y = 4; y < 7; y++) {
-                if (Global.OccupiedByPlayer(10, y)) output.Append('P');
+                if (Global.OccupiedByPlayer(Global.height, y)) output.Append('P');
                 else output.Append(' ');
             }
             output.Append("----+\n");
         } else {
-            output.Append("+-----------+\n");
+            output.Append("+" + new string('-', Global.width) + "+\n");
         }
         Console.Write(output.ToString());
+        Debug.WriteLine(output.ToString());
+    }
+
+    public static void Simulate() {
+        while (Global.enemies.Count > 0) {
+            DrawGrid();
+            Console.Write($"Beat: {Global.beat}, Input: ");
+            ConsoleKeyInfo input = Console.ReadKey();
+            while (!Player.HandleInput(input.Key, out _)) continue;
+
+            Console.Write("\n"); // newline after the input is read successfully
+
+            List<Enemy> enemies = new(Global.enemies); // To allow additions during enumeration
+            foreach (var enemy in enemies) enemy.Update();
+        }
     }
 
     public static void Main() {
+        Simulate();
+
         RNG.Seed(0);
         Init();
         Global.beat = 0; // 100 beats should be enough, since lures is only like 80 or so.

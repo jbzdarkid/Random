@@ -1,5 +1,6 @@
-﻿
-using System.Diagnostics;
+﻿using System.Diagnostics;
+
+namespace DeadRinger;
 
 public enum Direction {
     None = 0,
@@ -174,20 +175,45 @@ public class Enemy {
     }
 }
 
-public class Dragon : Enemy {
+public class Sarcophagus : Enemy {
     public int delay = 0;
-    public Dragon(int x, int y) : base(x, y, 4) {}
+    public Func<Enemy> summon;
+    public Enemy? enemy;
+    public Sarcophagus(int x, int y, Func<Enemy> summon) : base(x, y, 8) {
+        this.summon = summon;
+    }
 
     public override void Update() {
-        Direction newDir = this.ChangeDirection();
-
         if (this.delay > 0) {
             this.delay--;
-            if (newDir != Direction.None) this.dir = newDir;
             return;
         }
 
-        if (newDir == Direction.None) return; // We already checked, our current direction is blocked by an enemy.
+        if (this.enemy == null) {
+            this.enemy = this.summon();
+            Global.enemies.Add(this.enemy);
+            this.enemy.Update();
+        }
+        this.delay = 8;
+    }
+}
+
+public class Dragon : Enemy {
+    public int delay = 0;
+    public Dragon(int x, int y, int delay = 1) : base(x, y, 4) {
+        this.delay = delay;
+    }
+
+    public override void Update() {
+        Direction newDir = this.ChangeDirection();
+        if (newDir != Direction.None) this.dir = newDir;
+
+        if (this.delay > 0) {
+            this.delay--;
+            return;
+        }
+
+        if (newDir == Direction.None) return; // We already checked and found that our current direction is blocked by an enemy.
 
         (var newX, var newY) = this.dir.Add(this.x, this.y);
         if (Global.OccupiedByAnyEnemy(newX, newY)) return; // Blocked
@@ -205,19 +231,21 @@ public class Ogre : Enemy {
     public Ogre(int x, int y) : base(x, y, 10) { }
 
     public override void Update() {
-        if (this.delay > 1) {
+        if (this.delay > 0) {
             this.delay--;
             return;
         }
 
         Direction newDir = this.ChangeDirection();
 
+        /*
         // If an Ogre spots the player on the beat before they move, they will *plan* to change direction if the player isn't in hitting range next beat.
         if (this.delay == 1) {
             if (newDir != Direction.None) this.plannedDirection = newDir;
             this.delay--;
             return;
         }
+        */
 
         // If we've already committed to a swing, follow through
         if (this.swingDir != Direction.None) {
@@ -250,8 +278,9 @@ public class Ogre : Enemy {
             return;
         }
 
-        // If the player isn't in range, then we get to move.
-        (var newX, var newY) = this.plannedDirection.Add(this.x, this.y);
+        // If the player isn't in range, then we attempt to move in our planned direction.
+        if (this.plannedDirection != Direction.None) this.dir = this.plannedDirection;
+        (var newX, var newY) = this.dir.Add(this.x, this.y);
         if (Global.OccupiedByAnyEnemy(newX, newY)) return; // Bonk, will move next frame.
         // It shouldn't be possible for the Ogre to occupy the same space as the player, we would've been able to see them earlier.
 
