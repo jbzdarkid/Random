@@ -30,6 +30,11 @@ public static class DirectionExtensions {
         => direction == Direction.East || direction == Direction.West || direction == Direction.EastWest;
 }
 
+public static class IntExtensions {
+    // Inclusive on min and max.
+    public static bool Between(this int val, int min, int max) => val >= min && val <= max;
+}
+
 public static class Player {
     public static int x, y;
     public static int weaponDamage = 1; // TODO: Starting with base dagger for now
@@ -110,6 +115,7 @@ public class Enemy {
     public Enemy(int x, int y, int health) {
         this.x = x;
         this.y = y;
+        this.health = health;
     }
 
     // Most enemies share logic for movement -- they move axis-aligned (northsouth / eastwest), trying align with the player
@@ -217,7 +223,12 @@ public class Dragon : Enemy {
 
         (var newX, var newY) = this.dir.Add(this.x, this.y);
         if (Global.OccupiedByAnyEnemy(newX, newY)) return; // Blocked
-        if (Global.OccupiedByPlayer(newX, newY)) Player.OnHit(this.dir, 4);
+        if (Global.OccupiedByPlayer(newX, newY)) {
+            Player.OnHit(this.dir, 4);
+            this.delay = 1;
+            return;
+        }
+
         this.x = newX;
         this.y = newY;
         this.delay = 1;
@@ -226,67 +237,101 @@ public class Dragon : Enemy {
 
 public class Ogre : Enemy {
     public int delay = 0;
-    public Direction plannedDirection = Direction.None;
-    public Direction swingDir = Direction.None;
-    public Ogre(int x, int y) : base(x, y, 10) { }
+    public bool cannotSwing = true; // Ogres are not allowed to swing at the player until they've moved once (to avoid jumpscares)
+    public Direction swinging = Direction.None;
+    public Direction plannedDir = Direction.None;
+    public Ogre(int x, int y, int delay = 1) : base(x, y, 5) {
+        this.delay = delay;
+    }
 
+    // Ogres will make 90 degree inside turns if the player is somewhat nearby.
+    public Direction PlanDirectionChange() {
+        if (this.dir == Direction.North && this.x.Between(Player.x - 1, Player.x)) {
+            if (this.y < Player.y) return Direction.East;
+            if (this.y > Player.y) return Direction.West;
+        } else if (this.dir == Direction.South && this.x.Between(Player.x, Player.x + 1)) {
+            if (this.y < Player.y) return Direction.East;
+            if (this.y > Player.y) return Direction.West;
+        } else if (this.dir == Direction.NorthSouth && this.x == Player.x) {
+            if (this.y < Player.y) return Direction.East;
+            if (this.y > Player.y) return Direction.West;
+        } else if (this.dir == Direction.East && this.y.Between(Player.y, Player.y + 1)) {
+            if (this.x > Player.x) return Direction.North;
+            if (this.x < Player.x) return Direction.South;
+        } else if (this.dir == Direction.West && this.y.Between(Player.y - 1, Player.y)) {
+            if (this.x > Player.x) return Direction.North;
+            if (this.x < Player.x) return Direction.South;
+        } else if (this.dir == Direction.EastWest && this.y == Player.y) {
+            if (this.x > Player.x) return Direction.North;
+            if (this.x < Player.x) return Direction.South;
+        }
+
+        return Direction.None;
+    }
+    
     public override void Update() {
+        // If the player is immediately adjacent (i.e. would block our movement), overrite the instant swing prevention.
+        if (this.cannotSwing) {
+            if (Global.OccupiedByPlayer(this.x - 1, this.y)
+                || Global.OccupiedByPlayer(this.x + 1, this.y)
+                || Global.OccupiedByPlayer(this.x, this.y + 1)
+                || Global.OccupiedByPlayer(this.x, this.y - 1)) this.cannotSwing = false;
+        }
+
+        // Ogres plan certain actions one beat in advance.
+        if (this.delay == 1) {
+            if (!this.cannotSwing) this.swinging = this.CanSeePlayer(range: 3);
+            if (this.swinging == Direction.None) this.plannedDir = this.PlanDirectionChange();
+        }
+
         if (this.delay > 0) {
             this.delay--;
             return;
         }
 
-        Direction newDir = this.ChangeDirection();
-
-        /*
-        // If an Ogre spots the player on the beat before they move, they will *plan* to change direction if the player isn't in hitting range next beat.
-        if (this.delay == 1) {
-            if (newDir != Direction.None) this.plannedDirection = newDir;
-            this.delay--;
-            return;
+        // Ogres can also read a swing on the beat they move. If this happens, we still delay a beat before the next swing.
+        if (!this.cannotSwing && this.swinging == Direction.None) {
+            this.swinging = this.CanSeePlayer(range: 3);
+            if (this.swinging != Direction.None) {
+                this.delay = 1;
+                return;
+            }
         }
-        */
+
+        this.cannotSwing = false; // Even if we don't move because we were blocked by an enemy, this restriction only applies once.
 
         // If we've already committed to a swing, follow through
-        if (this.swingDir != Direction.None) {
+        if (this.swinging != Direction.None) {
             int i = this.x;
             int j = this.y;
             for (int k = 0; k < 3; k++) {
-                (i, j) = this.swingDir.Add(i, j);
+                (i, j) = this.swinging.Add(i, j);
                 var bell = Global.OccupiedByBell(i, j);
                 if (bell != null) bell.Ring();
                 else {
                     var enemy = Global.OccupiedByEnemy(i, j);
-                    if (enemy != null) enemy.OnHit(this.swingDir, 5);
-                    else if (Global.OccupiedByPlayer(i, j)) {
-                        Player.OnHit(this.swingDir, 5);
-                    }
+                    if (enemy != null) enemy.OnHit(this.swinging, 5);
+                    else if (Global.OccupiedByPlayer(i, j)) Player.OnHit(this.swinging, 5);
                 }
             }
 
-            this.swingDir = Direction.None;
-            this.delay = 4;
+            this.swinging = Direction.None;
+            this.delay = 3;
             return;
         }
+        
+        // Finally, if we aren't readying a swing or following through, we move in either our planned direction or the existing one.
+        Direction newDir = this.plannedDir;
+        if (newDir == Direction.None) newDir = this.ChangeDirection();
+        if (newDir == Direction.None) return; // We checked and found that our current direction is blocked by an enemy.
+        this.dir = newDir;
+        this.plannedDir = Direction.None;
 
-        // It is now time to move. If the player is in range (3 blocks), ready a swing but *don't* change direction.
-        // If the player is out of range, move toward them (in the planned direction).
-        Debug.Assert(this.delay == 0);
-        Direction swing = this.CanSeePlayer(range: 3);
-        if (swing != Direction.None) {
-            this.swingDir = swing;
-            return;
-        }
-
-        // If the player isn't in range, then we attempt to move in our planned direction.
-        if (this.plannedDirection != Direction.None) this.dir = this.plannedDirection;
         (var newX, var newY) = this.dir.Add(this.x, this.y);
-        if (Global.OccupiedByAnyEnemy(newX, newY)) return; // Bonk, will move next frame.
-        // It shouldn't be possible for the Ogre to occupy the same space as the player, we would've been able to see them earlier.
-
+        if (Global.OccupiedByAnyEnemy(newX, newY)) return; // Blocked
         this.x = newX;
         this.y = newY;
-        this.delay = 4;
+        this.delay = 3;
     }
 }
 

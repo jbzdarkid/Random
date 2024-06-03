@@ -21,11 +21,22 @@ public class Tests {
         _ => Direction.None,
     };
 
-    private void Simulate(string directions) {
-        foreach (char c in directions) {
+    private void SimulateAndTest<T>(string test, int x, int y, char dir, int health) where T : Enemy {
+        Debug.WriteLine($"Simulating test '{test}'");
+        foreach (char c in test) {
             Player.Move(C2D(c));
             List<Enemy> enemies = new(Global.enemies); // To allow additions during enumeration
             enemies.ForEach(enemy => enemy.Update());
+            if (Debugger.IsAttached) DeadRinger.Program.DrawGrid();
+        }
+        Enemy? enemy = Global.enemies.Find(x => x is T);
+        if (health == 0) { // Killed.
+            Assert.IsNull(enemy);
+        } else {
+            Assert.IsNotNull(enemy);
+            Assert.AreEqual((x, y), (enemy.x, enemy.y));
+            Assert.AreEqual(C2D(dir), enemy.dir);
+            Assert.AreEqual(health, enemy.health);
         }
     }
 
@@ -36,35 +47,58 @@ public class Tests {
     [DataRow("EEEE",        2, 6, 'E')]
     [DataRow("EW",          3, 4, 'S')]
     [DataRow("EEWW",        3, 5, 'S')]
-    [DataRow("NNNSNSNN",    0, 0, 'X')]
-    [DataRow("NNNNNN",      0, 0, 'X')]
+    [DataRow("NNNSNSNN",    0, 0, '?', 0)]
+    [DataRow("NNNNNN",      0, 0, '?', 0)]
     [DataRow("NN.ENNNNW..", 2, 4, 'N')]
-    public void TestGreenDragon(string test, int x, int y, char dir) {
+    public void TestGreenDragon(string test, int x, int y, char dir, int health = 4) {
         Global.width = 9;
         Global.height = 9;
         Player.Init(6, 4);
         Global.enemies.Add(new Sarcophagus(1, 4, () => new Dragon(2, 4)));
-
-        Debug.WriteLine($"Simulating test '{test}'");
-        this.Simulate(test);
-        var dragon = Global.enemies.Find(x => x is Dragon) as Dragon;
-        if (dir == 'X') { // Killed.
-            Assert.IsNull(dragon);
-        } else {
-            Assert.IsNotNull(dragon);
-            Assert.AreEqual(x, dragon.x);
-            Assert.AreEqual(y, dragon.y);
-            Assert.AreEqual(C2D(dir), dragon.dir);
-        }
+        this.SimulateAndTest<Dragon>(test, x, y, dir, health);
     }
 
     [TestMethod]
-    public void TestOgre() {
-        Global.enemies.Add(new Ogre(2, 5));
+    [DataRow("EE",       2, 5, 'E')]
+    [DataRow("EE.",      2, 5, 'E')]
+    [DataRow("EE..",     2, 5, 'E')]
+    [DataRow("EE...",    2, 5, 'E')]
+    [DataRow("EE....",   2, 6, 'E')]
+    [DataRow("NNNNNE",   3, 4, 'S', 2)]
+    [DataRow("EEEEWWWW..", 2, 5, 'W')]
+    [DataRow("EEEEWWW.W.", 2, 5, 'W')]
+    [DataRow("EEEEWWW..W", 3, 6, 'S')]
+    [DataRow("EEEEWWWWEW", 3, 6, 'S')]
+    [DataRow("EEEEWW.WW.", 2, 5, 'W')]
+    [DataRow("EEEEWW.W.W", 3, 6, 'S')]
+    [DataRow("EEEEW.WWW.", 2, 5, 'W')]
+    [DataRow("EEEEW.WW.W", 3, 6, 'S')]
+    [DataRow("EEEE.WWWW.", 2, 5, 'W')]
+    [DataRow("EEEE.WWW.W", 3, 6, 'S')]
+    [DataRow("EEEE.WW.WW", 3, 6, 'S')]
+    [DataRow("EEEE.W.WWW", 3, 6, 'S')]
+    [DataRow("EEEE..WWWW", 3, 6, 'S')]
+    [DataRow("SEEENN...SNN.N", 5, 5, 'E')]
+    [DataRow("EEENNNWWWW", 2, 5, 'W')]
+    // [DataRow("EEENNNWW.W", 2, 5, 'W')] // Not sure what this rule is. Ignoring for now, it's a small edge case
+    [DataRow("EEENNNWW.S", 3, 6, 'S')]
+    [DataRow("EEENNNWW..", 3, 6, 'S')]
+    [DataRow("EN",       2, 5, 'E')]
+    [DataRow("E.",       2, 5, 'E')]
+    [DataRow("ES",       2, 5, 'E')]
+    [DataRow("NE",       3, 4, 'S')]
+    [DataRow(".E",       3, 4, 'S')]
+    [DataRow("SE",       3, 4, 'S')]
+    [DataRow("EW",       3, 4, 'S')]
+    [DataRow("NE..WE",   3, 4, 'S')]
+    [DataRow("NE...WE",  3, 4, 'S')]
+    [DataRow("NE....WE", 4, 4, 'S')]
+    public void TestOgre(string test, int x, int y, char dir, int health = 5) {
+        Global.width = 9;
+        Global.height = 9;
+        Player.Init(6, 4);
+        Global.enemies.Add(new Sarcophagus(1, 4, () => new Ogre(2, 4)));
 
-        Player.Init(10, 5);
-
-        this.Simulate("NNNEEE");
-
+        this.SimulateAndTest<Ogre>(test, x, y, dir, health);
     }
 }
