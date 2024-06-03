@@ -37,7 +37,7 @@ public static class Global {
 public static class Program {
     public static void Init() {
         Global.bells = [
-            new(3, 2, (x, y) => new Dragon(x, y, delay: 0)),
+            new(3, 2, (x, y) => new GreenDragon(x, y, delay: 0)),
             new(3, 8, (x, y) => new Ogre(x, y)),
             new(8, 2, (x, y) => new Nightmare(x, y)),
             new(8, 8, (x, y) => new Minotaur(x, y)),

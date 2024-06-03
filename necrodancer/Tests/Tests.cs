@@ -18,6 +18,8 @@ public class Tests {
         'E' => Direction.East,
         'S' => Direction.South,
         'W' => Direction.West,
+        'X' => Direction.NorthSouth,
+        'Y' => Direction.EastWest,
         _ => Direction.None,
     };
 
@@ -54,8 +56,26 @@ public class Tests {
         Global.width = 9;
         Global.height = 9;
         Player.Init(6, 4);
-        Global.enemies.Add(new Sarcophagus(1, 4, () => new Dragon(2, 4)));
-        this.SimulateAndTest<Dragon>(test, x, y, dir, health);
+        Global.enemies.Add(new Sarcophagus(1, 4, () => new GreenDragon(2, 4)));
+        this.SimulateAndTest<GreenDragon>(test, x, y, dir, health);
+    }
+
+    [TestMethod]
+    [DataRow("E",           2, 4, 'E')]
+    [DataRow("EE",          2, 5, 'E')]
+    [DataRow("EEE",         2, 5, 'E')]
+    [DataRow("EEEE",        2, 6, 'E')]
+    [DataRow("EW",          3, 4, 'S')]
+    [DataRow("EEWW",        3, 5, 'S')]
+    [DataRow("NNNSNSN",     0, 0, '?', 0)]
+    [DataRow("NNNNN" ,      0, 0, '?', 0)]
+    [DataRow("NN.ENNNNW..", 2, 4, 'N')]
+    public void TestNightmare(string test, int x, int y, char dir, int health = 3) {
+        Global.width = 9;
+        Global.height = 9;
+        Player.Init(6, 4);
+        Global.enemies.Add(new Sarcophagus(1, 4, () => new Nightmare(2, 4)));
+        this.SimulateAndTest<Nightmare>(test, x, y, dir, health);
     }
 
     [TestMethod]
@@ -100,5 +120,24 @@ public class Tests {
         Global.enemies.Add(new Sarcophagus(1, 4, () => new Ogre(2, 4)));
 
         this.SimulateAndTest<Ogre>(test, x, y, dir, health);
+    }
+
+    [TestMethod]
+    [DataRow("SSE....WWW",    0, 0, '?', 0)]
+    [DataRow("ENNNNN",        0, 0, '?', 0)]
+    [DataRow("E",             2, 4, 'Y')]
+    [DataRow("EE",            2, 5, 'E')]
+    [DataRow("EEE",           2, 6, 'E')]
+    [DataRow("EEEE",          2, 7, 'E')]
+    [DataRow("EEEEE",         2, 8, 'E')]
+    [DataRow("S....EWW.W.",   8, 3, 'W', 2)]
+    [DataRow("S....EWW..W",   7, 4, 'N', 2)]
+    public void TestMinotaur(string test, int x, int y, char dir, int health = 3) {
+        Global.width = 9;
+        Global.height = 9;
+        Player.Init(6, 4);
+        Global.enemies.Add(new Sarcophagus(1, 4, () => new Minotaur(2, 4)));
+
+        this.SimulateAndTest<Minotaur>(test, x, y, dir, health);
     }
 }
