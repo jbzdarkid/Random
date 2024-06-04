@@ -30,7 +30,7 @@ public class Enemy {
             else Debug.Assert(false);
         } else { // Else, we've already decided a direction, only change if we're blocked
             (var newX, var newY) = this.dir.Add(this.x, this.y);
-            if (Global.OccupiedByAnyEnemy(newX, newY)) {
+            if (Global.OccupiedByEnemy(newX, newY, out _)) {
                 if (this.dir.EastOrWest()) {
                     if      (this.x > Player.x) return Direction.North;
                     else if (this.x < Player.x) return Direction.South;
@@ -46,23 +46,27 @@ public class Enemy {
         return this.dir; // Keep moving toward the player
     }
 
-    public Direction CanSeePlayer(int range) {
+    public Direction CanSeePlayer(int range) => this.CanSeeTarget(Player.x, Player.y, range);
+    public Direction CanSeePreviousPlayerPosition(int range) => this.CanSeeTarget(Player.previousX, Player.previousY, range);
+    public Direction CanSeeTarget(int x, int y, int range) {
+        // Start with a sanity check that we're in a straight line, and within range
         Direction dir;
-        if      (this.x >= Player.x && this.y == Player.y) dir = Direction.North;
-        else if (this.x <= Player.x && this.y == Player.y) dir = Direction.South;
-        else if (this.x == Player.x && this.y <= Player.y) dir = Direction.East;
-        else if (this.x == Player.x && this.y >= Player.y) dir = Direction.West;
+        if      (this.x >= x && this.y == y) dir = Direction.North;
+        else if (this.x <= x && this.y == y) dir = Direction.South;
+        else if (this.x == x && this.y <= y) dir = Direction.East;
+        else if (this.x == x && this.y >= y) dir = Direction.West;
         else return Direction.None;
 
-        int distanceToPlayer = Math.Abs(this.x - Player.x) + Math.Abs(this.y - Player.y);
+        int distanceToPlayer = Math.Abs(this.x - x) + Math.Abs(this.y - y);
         if (distanceToPlayer > range) return Direction.None;
 
+        // Then iterate all the squares between here and there.
         var i = this.x;
         var j = this.y;
         while (true) {
             (i, j) = dir.Add(i, j);
-            if (Global.OccupiedByAnyEnemy(i, j)) return Direction.None;
-            if (Global.OccupiedByPlayer(i, j)) return dir;
+            if (Global.OccupiedByEnemy(i, j, out _)) return Direction.None;
+            if (i == x && j == y) return dir;
         }
     }
 
@@ -72,7 +76,7 @@ public class Enemy {
 
     public virtual void OnHit(Direction dir, int damage) {
         this.health -= damage;
-        if (this.health <= 0) Global.enemies.Remove(this);
+        if (this.health <= 0) Global.oldEnemies.Add(this);
     }
 }
 
@@ -94,7 +98,7 @@ public class BasicMiniboss : Enemy {
         if (newDir == Direction.None) return; // We already checked and found that our current direction is blocked by an enemy.
 
         (var newX, var newY) = this.dir.Add(this.x, this.y);
-        if (Global.OccupiedByAnyEnemy(newX, newY)) return; // Blocked
+        if (Global.OccupiedByEnemy(newX, newY, out _)) return; // Blocked by an enemy, just bump
         if (Global.OccupiedByPlayer(newX, newY)) {
             Player.OnHit(this.dir, this.damage);
             this.delay = 1;
@@ -187,13 +191,8 @@ public class Ogre : Enemy {
             int j = this.y;
             for (int k = 0; k < 3; k++) {
                 (i, j) = this.swinging.Add(i, j);
-                var bell = Global.OccupiedByBell(i, j);
-                if (bell != null) bell.Ring();
-                else {
-                    var enemy = Global.OccupiedByEnemy(i, j);
-                    if (enemy != null) enemy.OnHit(this.swinging, 5);
-                    else if (Global.OccupiedByPlayer(i, j)) Player.OnHit(this.swinging, 5);
-                }
+                if (Global.OccupiedByEnemy(i, j, out Enemy? enemy)) enemy.OnHit(this.swinging, 5);
+                else if (Global.OccupiedByPlayer(i, j)) Player.OnHit(this.swinging, 5);
             }
 
             this.swinging = Direction.None;
@@ -209,7 +208,7 @@ public class Ogre : Enemy {
         this.plannedDir = Direction.None;
 
         (var newX, var newY) = this.dir.Add(this.x, this.y);
-        if (Global.OccupiedByAnyEnemy(newX, newY)) return; // Blocked
+        if (Global.OccupiedByEnemy(newX, newY, out _)) return; // Blocked
         this.x = newX;
         this.y = newY;
         this.delay = 3;
@@ -221,36 +220,32 @@ public class Minotaur : Enemy {
     public Minotaur(int x, int y, int delay = 1) : base(x, y, 3, delay) { }
 
     public override void Update() {
-        if (this.delay > 1) {
-            this.delay--;
-            return;
-        }
-
-        // Minotaurs can ready a charge if they see the player right as they stand up (delay = 1)
-        // or while generally moving around (delay = 0)
-        if (this.charging == Direction.None) this.charging = this.CanSeePlayer(range: 6);
-
         if (this.delay > 0) {
             this.delay--;
             return;
         }
 
+        // Minotaurs will charge at the player's last known position as well as their current position.
+        if (this.charging == Direction.None) this.charging = this.CanSeePlayer(range: 6);
+        if (this.charging == Direction.None) this.charging = this.CanSeePreviousPlayerPosition(range: 6);
+
         int newX, newY;
         if (this.charging != Direction.None) {
             this.dir = this.charging; // Just for clarity / testing purposes, charging is still the source of truth.
             (newX, newY) = this.charging.Add(x, y);
-            Bell? bell = null;
+            Enemy? enemy = null;
             if (!Global.IsOob(newX, newY)
                 && !Global.OccupiedByPlayer(newX, newY)
-                && (bell = Global.OccupiedByBell(newX, newY)) == null
-                && !Global.OccupiedByAnyEnemy(newX, newY)) {
+                && !Global.OccupiedByEnemy(newX, newY, out enemy)) {
                 // Charge is not obstructed, keep on charging
                 this.x = newX;
                 this.y = newY;
                 return;
             }
-
-            bell?.Ring(); // Minotaurs ring bells if they charge into them
+            
+            // Minotaurs ring bells if they charge into them, but don't damage other enemies.
+            if (Global.OccupiedByPlayer(newX, newY)) Player.OnHit(this.charging, 4);
+            if (enemy is Bell bell) bell.OnHit(this.charging, 4);
 
             // When a minotaur finishes charging, it swaps to the perpendicular axis.
             // Note that this is just the preferred direction, it will charge if the player is aligned in any direction.
@@ -266,7 +261,7 @@ public class Minotaur : Enemy {
         this.dir = newDir;
 
         (newX, newY) = this.dir.Add(this.x, this.y);
-        if (Global.OccupiedByAnyEnemy(newX, newY)) return; // Blocked
+        if (Global.OccupiedByEnemy(newX, newY, out _)) return; // Blocked
 
         this.x = newX;
         this.y = newY;
@@ -308,6 +303,12 @@ public class DeadRinger : Enemy {
     }
 
     public override void Update() {
+        bool allBellsRung = !Global.enemies.Exists(x => x is Bell);
+        if (!allBellsRung) this.UpdatePhase1();
+        else               this.UpdatePhase2();
+    }
+
+    public void UpdatePhase1() {
         // Charging direction is immediate, but still respects delay frames.
         if (this.charging == Direction.None) this.charging = this.CanSeePlayer(range: 7);
 
@@ -321,19 +322,12 @@ public class DeadRinger : Enemy {
             (var newX, var newY) = this.charging.Add(x, y);
             if (Global.IsOob(newX, newY)) {
                 this.charging = Direction.None; // Charge finished. Stun for 1 frame then we'll resume next frame.
-                return;
-            }
-            var bell = Global.OccupiedByBell(newX, newY);
-            if (bell != null) {
-                Global.bells.Remove(bell); // Destroyed by DR
-                this.charging = Direction.None;
                 this.delay = 1;
                 return;
-            }
-            var enemy = Global.OccupiedByEnemy(newX, newY);
-            if (enemy != null) {
-                // TODO: Probably DR kills things when he charges them idk
+            } else if (Global.OccupiedByEnemy(newX, newY, out Enemy? enemy)) {
+                if (enemy is Bell bell) Global.oldEnemies.Add(bell); // Dead Ringer destroys bells if he charges them, but does not damage enemies (in phase 1)
                 this.charging = Direction.None;
+                this.delay = 1;
                 return;
             }
 
@@ -344,11 +338,21 @@ public class DeadRinger : Enemy {
 
         if (this.nextBell != null) {
             if (this.x == this.nextBell.x - 1 && this.y == this.nextBell.y) {
-                // Ring the bell
-                this.nextBell.Ring();
-                int currentIndex = Global.bells.IndexOf(nextBell);
-                int nextIndex = (currentIndex + 1) % Global.bells.Count;
-                this.nextBell = Global.bells[nextIndex];
+                this.nextBell.OnHit(Direction.South, 1); // Ring the bell
+
+                // Find the next bell in the list
+                Bell? nextBell = null;
+                bool foundThisBell = false;
+                foreach (var enemy in Global.enemies) {
+                    if (enemy.x == this.nextBell.x && enemy.y == this.nextBell.y) {
+                        foundThisBell = true;
+                        continue;
+                    } else if (foundThisBell && enemy is Bell bell) {
+                        nextBell = bell;
+                        break;
+                    }
+                }
+                this.nextBell = nextBell;
                 return;
             }
 
@@ -360,15 +364,76 @@ public class DeadRinger : Enemy {
             if      (this.y < nextBell.y) newY = this.y + 1;
             else if (this.y > nextBell.y) newY = this.y - 1;
 
-            if (Global.OccupiedByBell(newX, newY) != null || Global.OccupiedByEnemy(newX, newY) != null) {
-                newY = this.y; // not sure if correct. whatevs.
-            }
+            // TODO: I'm not sure exactly how Dead Ringer handles situations where the diagonal is blocked. This is fine for now.
+            if (Global.OccupiedByEnemy(newX, newY, out _)) newY = this.y;
 
             this.x = newX;
             this.y = newY;
             this.delay = 1;
-            if (this.x == this.nextBell.x - 1 && this.y == this.nextBell.y) delay++; // Extra delay for ringing the bell. I think this works.
+            if (this.x == this.nextBell.x - 1 && this.y == this.nextBell.y) delay++; // Extra delay to simulate the bell ring windeup.
         }
+    }
+
+    public Direction dash;
+    public void UpdatePhase2() {
+        // In phase 2, dead ringer will move diagonally toward the player, then ready and dash at them. This dash is full screen.
+        if (this.delay > 0) {
+            this.delay--;
+            return;
+        }
+
+        int newX, newY;
+        if (this.dash != Direction.None) {
+            bool hitAnything = false;
+            while (!hitAnything) {
+                (newX, newY) = this.dash.Add(x, y);
+                if (Global.IsOob(newX, newY)) {
+                    if (newX == -1 && newY == 5) { // We hit the gong, time to die
+                        Global.oldEnemies.Add(this);
+                    }
+                    hitAnything = true;
+                } else if (Global.OccupiedByEnemy(newX, newY, out Enemy? enemy)) {
+                    enemy.OnHit(this.dash, 8);
+                    hitAnything = true;
+                } else if (Global.OccupiedByPlayer(newX, newY)) {
+                    Player.OnHit(this.dash, 8);
+                    hitAnything = true;
+                }
+                
+                if (!hitAnything) {
+                    this.x = newX;
+                    this.y = newY;
+                }
+            }
+
+            this.dash = Direction.None;
+            return;
+        }
+
+        if (this.dash == Direction.None) this.dash = this.CanSeePlayer(6);
+        if (this.dash == Direction.None) this.dash = this.CanSeePreviousPlayerPosition(6);
+        if (this.dash != Direction.None) {
+            this.delay = 1;
+            return;
+        }
+
+        // Move diagonally toward the player.
+        newX = this.x;
+        if      (this.x < Player.x) newX++;
+        else if (this.x > Player.x) newX--;
+        newY = this.y;
+        if      (this.y < Player.y) newY++;
+        else if (this.y > Player.y) newY--;
+
+        // TODO: I'm not sure exactly how Dead Ringer handles situations where the diagonal is blocked. This is fine for now.
+        if (Global.OccupiedByEnemy(newX, newY, out _)) newY = this.y;
+        if (Global.OccupiedByPlayer(newX, newY)) {
+            Player.OnHit(Direction.None, 4); // TODO: Diagonal damage sources?
+            return;
+        }
+
+        this.x = newX;
+        this.y = newY;
     }
 
     public override void OnHit(Direction dir, int damage) {
@@ -392,9 +457,43 @@ public class Sarcophagus : Enemy {
 
         if (this.enemy == null) {
             this.enemy = this.summon();
-            Global.enemies.Add(this.enemy);
+            Global.newEnemies.Add(this.enemy);
             this.enemy.Update();
         }
         this.delay = 8;
+    }
+}
+
+public class Bell : Enemy {
+    public bool rung => this.rungOn != -1;
+    private int rungOn = -1;
+    Func<int, int, Enemy> summon;
+    Enemy? enemy;
+
+    public Bell(int x, int y, Func<int, int, Enemy> summon) : base(x, y, 999, 0) {
+        this.x = x;
+        this.y = y;
+        this.summon = summon;
+    }
+
+    public override void OnHit(Direction dir, int damage) {
+        // Within 9 beats of the last time rung OR miniboss is still alive
+        if (this.rung && Global.beat - this.rungOn < 9) return;
+        if (this.enemy != null) return;
+        this.rungOn = Global.beat;
+
+        (int, int)[] spawnTargets = [(this.x + 1, this.y), (this.x, this.y - 1), (this.x, this.y + 1)];
+        foreach ((int x, int y) in spawnTargets) {
+            if (Global.OccupiedByPlayer(x, y) || Global.OccupiedByEnemy(x, y, out _)) continue;
+            this.enemy = this.summon(x, y);
+            this.enemy.Update();
+            Global.newEnemies.Add(this.enemy);
+            break;
+        }
+
+        if (this.enemy == null) {
+            (int x, int y) = Global.RandomLocation();
+            this.enemy = this.summon(x, y);
+        }
     }
 }

@@ -3,11 +3,8 @@ using System.Diagnostics;
 
 namespace DeadRingerTest;
 
-public class Program {
-}
-
 [TestClass]
-public class Tests {
+public class MinibossTests {
     [TestCleanup]
     public void Cleanup() {
         Global.enemies.Clear();
@@ -27,9 +24,8 @@ public class Tests {
         Debug.WriteLine($"Simulating test '{test}'");
         foreach (char c in test) {
             Player.Move(C2D(c));
-            List<Enemy> enemies = new(Global.enemies); // To allow additions during enumeration
-            enemies.ForEach(enemy => enemy.Update());
-            if (Debugger.IsAttached) DeadRinger.Program.DrawGrid();
+            Global.SimulateBeat();
+            if (Debugger.IsAttached) Program.DrawGrid();
         }
         Enemy? enemy = Global.enemies.Find(x => x is T);
         if (health == 0) { // Killed.

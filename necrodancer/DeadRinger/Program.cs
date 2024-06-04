@@ -1,13 +1,14 @@
 ﻿using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 
 namespace DeadRinger;
 
 public static class Global {
-    public static List<Bell> bells = [];
     public static List<Enemy> enemies = [];
+    public static List<Enemy> newEnemies = []; // A separate list of enemies spawned during this beat, to be added after enemies are updated.
+    public static List<Enemy> oldEnemies = []; // A separate list of enemies removed during this beat, to be deleted after enemies are updated.
     public static int beat = 0;
-    public static DeadRinger DeadRinger = new(-1, -1, null);
 
     public static int width = 11;
     public static int height = 10;
@@ -17,16 +18,23 @@ public static class Global {
         return x >= height;
     }
 
-    public static Bell? OccupiedByBell(int x, int y) =>
-        bells.Find(bell => bell.x == x && bell.y == y);
-    public static Enemy? OccupiedByEnemy(int x, int y) =>
-        enemies.Find(enemy => enemy.x == x && enemy.y == y);
-    public static bool OccupiedByDeadRinger(int x, int y) =>
-        x == DeadRinger.x && y == DeadRinger.y;
-    public static bool OccupiedByAnyEnemy(int x, int y) => 
-        OccupiedByDeadRinger(x, y) || OccupiedByBell(x, y) != null || OccupiedByEnemy(x, y) != null;
-    public static bool OccupiedByPlayer(int x, int y) =>
-        x == Player.x && y == Player.y;
+    public static void SimulateBeat() {
+        foreach (var enemy in enemies) enemy.Update();
+
+        // TODO: Enemy priority goes here, use SortedList.
+        enemies.RemoveAll(oldEnemies.Contains);
+        enemies.AddRange(newEnemies);
+        newEnemies.Clear();
+        oldEnemies.Clear();
+        beat++;
+    }
+
+    public static bool OccupiedByEnemy(int x, int y, [NotNullWhen(returnValue: true)] out Enemy? enemy) => OccupiedByEnemy<Enemy>(x, y, out enemy);
+    public static bool OccupiedByEnemy<T>(int x, int y, [NotNullWhen(returnValue: true)] out T? enemy) where T : Enemy {
+        enemy = enemies.Find(enemy => enemy.x == x && enemy.y == y) as T;
+        return enemy != null;
+    }
+    public static bool OccupiedByPlayer(int x, int y) => x == Player.x && y == Player.y;
 
 
     public static (int, int) RandomLocation() {
@@ -35,17 +43,15 @@ public static class Global {
 }
 
 public static class Program {
-    public static void Init() {
-        Global.bells = [
-            new(3, 2, (x, y) => new GreenDragon(x, y, delay: 0)),
-            new(3, 8, (x, y) => new Ogre(x, y)),
-            new(8, 2, (x, y) => new Nightmare(x, y)),
-            new(8, 8, (x, y) => new Minotaur(x, y)),
-        ];
+    public static void InitDeadRinger() {
+        Global.enemies.Add(new Bell(3, 2, (x, y) => new GreenDragon(x, y, delay: 0)));
+        Global.enemies.Add(new Bell(3, 8, (x, y) => new Ogre       (x, y, delay: 0)));
+        Global.enemies.Add(new Bell(8, 2, (x, y) => new Nightmare  (x, y, delay: 0)));
+        Global.enemies.Add(new Bell(8, 8, (x, y) => new Minotaur   (x, y, delay: 0)));
         if (RNG.Get(2) == 0) {
-            Global.DeadRinger = new(4, 3, Global.bells[0]);
+            Global.enemies.Add(new DeadRinger(4, 3, (Bell)Global.enemies[0]));
         } else {
-            Global.DeadRinger = new(4, 7, Global.bells[1]);
+            Global.enemies.Add(new DeadRinger(4, 7, (Bell)Global.enemies[1]));
         }
 
         Player.Init(10, 5);
@@ -56,12 +62,11 @@ public static class Program {
         for (int x = 0; x < Global.height; x++) {
             output.Append('|');
             for (int y = 0; y < Global.width; y++) {
-                var bell = Global.OccupiedByBell(x, y);
-                var enemy = Global.OccupiedByEnemy(x, y);
-                if (bell != null) output.Append(bell.rung ? 'B' : 'b');
-                else if (enemy != null) output.Append(char.ToLowerInvariant(enemy.GetType().Name?[0] ?? '?'));
+                if (Global.OccupiedByEnemy(x, y, out Enemy? enemy)) {
+                    if (enemy is Bell bell) output.Append(bell.rung ? 'B' : 'b');
+                    else output.Append(char.ToLowerInvariant(enemy.GetType().Name?[0] ?? '?'));
+                }
                 else if (Global.OccupiedByPlayer(x, y)) output.Append('P');
-                else if (Global.OccupiedByDeadRinger(x, y)) output.Append('D');
                 else output.Append(' ');
             }
             output.Append("|\n");
@@ -88,9 +93,7 @@ public static class Program {
             while (!Player.HandleInput(input.Key, out _)) continue;
 
             Console.Write("\n"); // newline after the input is read successfully
-
-            List<Enemy> enemies = new(Global.enemies); // To allow additions during enumeration
-            foreach (var enemy in enemies) enemy.Update();
+            Global.SimulateBeat();
         }
     }
 
@@ -98,7 +101,7 @@ public static class Program {
         Simulate();
 
         RNG.Seed(0);
-        Init();
+        InitDeadRinger();
         Global.beat = 0; // 100 beats should be enough, since lures is only like 80 or so.
         while (true) {
             DrawGrid();
@@ -131,9 +134,7 @@ public static class Program {
             }
             */
 
-            Global.DeadRinger.Update();
-            foreach (var enemy in Global.enemies) enemy.Update();
-            Global.beat++;
+            Global.SimulateBeat();
         }
     }
 }
