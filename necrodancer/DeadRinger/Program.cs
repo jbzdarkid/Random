@@ -64,6 +64,7 @@ public static class Program {
             for (int y = 0; y < Global.width; y++) {
                 if (Global.OccupiedByEnemy(x, y, out Enemy? enemy)) {
                     if (enemy is Bell bell) output.Append(bell.rung ? 'B' : 'b');
+                    else if (enemy is DeadRinger deadRinger) output.Append(deadRinger.phase2 ? 'D' : 'd');
                     else output.Append(char.ToLowerInvariant(enemy.GetType().Name?[0] ?? '?'));
                 }
                 else if (Global.OccupiedByPlayer(x, y)) output.Append('P');

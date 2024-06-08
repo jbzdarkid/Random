@@ -33,9 +33,8 @@ public class DeadRingerTests {
     [TestMethod]
     public void Oblivion() {
         string test = "ENNEEWWWWNWSWNNNEEENNENENNW";
-        RNG.Seed(0);
+        RNG.Seed([0]);
         Program.InitDeadRinger();
         this.SimulateAndTest(test);
     }
-
 }

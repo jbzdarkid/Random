@@ -1,6 +1,4 @@
-﻿using System.Diagnostics;
-
-namespace DeadRinger;
+﻿namespace DeadRinger;
 
 public enum Direction {
     None = 0,
@@ -119,7 +117,7 @@ public static class RNG {
         random = new Random(seed);
     }
 
-    public static void Seed(params int[] args) {
+    public static void Seed(ReadOnlySpan<int> args) {
         foreach (var value in args) values.Enqueue(value);
     }
 

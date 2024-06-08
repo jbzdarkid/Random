@@ -48,6 +48,7 @@ public class MinibossTests {
     [DataRow("NNNSNSNN",    0, 0, '?', 0)]
     [DataRow("NNNNNN",      0, 0, '?', 0)]
     [DataRow("NN.ENNNNW..", 2, 4, 'N')]
+    [DataRow("NNEENN",      4, 5, 'E')]
     public void TestGreenDragon(string test, int x, int y, char dir, int health = 4) {
         Global.width = 9;
         Global.height = 9;
