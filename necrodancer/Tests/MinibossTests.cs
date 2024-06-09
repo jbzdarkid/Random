@@ -39,16 +39,27 @@ public class MinibossTests {
     }
 
     [TestMethod]
-    [DataRow("E",           2, 4, 'E')]
-    [DataRow("EE",          2, 5, 'E')]
-    [DataRow("EEE",         2, 5, 'E')]
-    [DataRow("EEEE",        2, 6, 'E')]
-    [DataRow("EW",          3, 4, 'S')]
-    [DataRow("EEWW",        3, 5, 'S')]
-    [DataRow("NNNSNSNN",    0, 0, '?', 0)]
-    [DataRow("NNNNNN",      0, 0, '?', 0)]
-    [DataRow("NN.ENNNNW..", 2, 4, 'N')]
-    [DataRow("NNEENN",      4, 5, 'E')]
+    [DataRow("E",            2, 4, 'Y')]
+    [DataRow("EE",           2, 5, 'E')]
+    [DataRow("EEE",          2, 5, 'E')]
+    [DataRow("EEEE",         2, 6, 'E')]
+    [DataRow("EEEWEE",       2, 7, 'E')]
+    [DataRow("EEEWWW",       3, 6, 'S')]
+    [DataRow("EW",           3, 4, 'S')]
+    [DataRow("EEWW",         3, 5, 'S')]
+    [DataRow("NNNSNSNN",     0, 0, '?', 0)]
+    [DataRow("NNNNNN",       0, 0, '?', 0)]
+    [DataRow("NNEENN",       4, 5, 'E')]
+    [DataRow("NNE.NN",       3, 4, 'N')]
+    [DataRow("NNE.NE",       4, 5, 'E')]
+    [DataRow("NN.ENN",       3, 4, 'N')]
+    [DataRow("NN.ENE",       4, 5, 'E')]
+    [DataRow("NNEESS",       5, 4, 'S')]
+    [DataRow("NNE.SS",       5, 4, 'S')]
+    [DataRow("NNE.SE",       5, 4, 'S')]
+    [DataRow("NN.ESS",       5, 4, 'S')]
+    [DataRow("NN.ESE",       5, 4, 'S')]
+    [DataRow("NN.ENNNNW..W", 2, 3, 'W')]
     public void TestGreenDragon(string test, int x, int y, char dir, int health = 4) {
         Global.width = 9;
         Global.height = 9;
@@ -58,7 +69,7 @@ public class MinibossTests {
     }
 
     [TestMethod]
-    [DataRow("E",           2, 4, 'E')]
+    [DataRow("E",           2, 4, 'Y')]
     [DataRow("EE",          2, 5, 'E')]
     [DataRow("EEE",         2, 5, 'E')]
     [DataRow("EEEE",        2, 6, 'E')]
@@ -97,7 +108,7 @@ public class MinibossTests {
     [DataRow("EEEE..WWWW", 3, 6, 'S')]
     [DataRow("SEEENN...SNN.N", 5, 5, 'E')]
     [DataRow("EEENNNWWWW", 2, 5, 'W')]
-    // [DataRow("EEENNNWW.W", 2, 5, 'W')] // Not sure what this rule is. Ignoring for now, it's a small edge case
+    [DataRow("EEENNNWW.W", 2, 5, 'W')] // Not sure what this rule is. Ignoring for now, it's a small edge case
     [DataRow("EEENNNWW.S", 3, 6, 'S')]
     [DataRow("EEENNNWW..", 3, 6, 'S')]
     [DataRow("EN",       2, 5, 'E')]

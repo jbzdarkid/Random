@@ -87,19 +87,48 @@ public class BasicMiniboss : Enemy {
     }
 
     public override void Update() {
-        // Check to see if we aligned with the player (or their previous position), in which case we trigger a direction change.
-        if      (this.y == Player.y && this.x > Player.x) this.dir = Direction.North;
-        else if (this.y == Player.y && this.x < Player.x) this.dir = Direction.South;
-        else if (this.x == Player.x && this.y < Player.y) this.dir = Direction.East;
-        else if (this.x == Player.x && this.y > Player.y) this.dir = Direction.West;
-        else if (this.y == Player.previousY && this.x > Player.previousX) this.dir = Direction.North;
-        else if (this.y == Player.previousY && this.x < Player.previousX) this.dir = Direction.South;
-        else if (this.x == Player.previousX && this.y < Player.previousY) this.dir = Direction.East;
-        else if (this.x == Player.previousX && this.y > Player.previousY) this.dir = Direction.West;
-
         if (this.delay > 0) {
             this.delay--;
             return;
+        }
+
+        // Change direction if we aligned (or almost aligned) with the player last beat
+        if (this.dir == Direction.North && this.x.Between(Player.previousX - 1, Player.previousX)) {
+            if (this.x < Player.x - 1 && this.y.Between(Player.y - 1, Player.y + 1)) this.dir = Direction.South; // Knight's move special case
+            else if (this.y < Player.previousY) this.dir = Direction.East;
+            else if (this.y > Player.previousY) this.dir = Direction.West;
+        } else if (this.dir == Direction.South && this.x.Between(Player.previousX, Player.previousX + 1)) {
+            if (this.x > Player.x + 1 && this.y.Between(Player.y - 1, Player.y + 1)) this.dir = Direction.North; // Knight's move special case
+            else if (this.y < Player.previousY) this.dir = Direction.East;
+            else if (this.y > Player.previousY) this.dir = Direction.West;
+        } else if (this.dir == Direction.NorthSouth && this.x == Player.previousX) {
+            if (this.y < Player.previousY)      this.dir = Direction.East;
+            else if (this.y > Player.previousY) this.dir = Direction.West;
+        } else if (this.dir == Direction.East && this.y.Between(Player.previousY, Player.previousY + 1)) {
+            if (this.y > Player.y + 1 && this.x.Between(Player.x - 1, Player.x + 1)) this.dir = Direction.West; // Knight's move special case
+            else if (this.x > Player.previousX) this.dir = Direction.North;
+            else if (this.x < Player.previousX) this.dir = Direction.South;
+        } else if (this.dir == Direction.West && this.y.Between(Player.previousY - 1, Player.previousY)) {
+            if (this.y < Player.y - 1 && this.x.Between(Player.x - 1, Player.x + 1)) this.dir = Direction.East; // Knight's move special case
+            else if (this.x > Player.previousX) this.dir = Direction.North;
+            else if (this.x < Player.previousX) this.dir = Direction.South;
+        } else if (this.dir == Direction.EastWest && this.y == Player.previousY) {
+            if (this.x > Player.previousX)      this.dir = Direction.North;
+            else if (this.x < Player.previousX) this.dir = Direction.South;
+        }
+
+        // Change direction if we are aligned with the player on this beat
+        else if (this.y == Player.y && this.x > Player.x) this.dir = Direction.North;
+        else if (this.y == Player.y && this.x < Player.x) this.dir = Direction.South;
+        else if (this.x == Player.x && this.y < Player.y) this.dir = Direction.East;
+        else if (this.x == Player.x && this.y > Player.y) this.dir = Direction.West;
+
+        else if (this.dir.NorthOrSouth()) {
+            if      (this.x > Player.x) this.dir = Direction.North;
+            else if (this.x < Player.x) this.dir = Direction.South;
+        } else if (this.dir.EastOrWest()) {
+            if      (this.x < Player.y) this.dir = Direction.East;
+            else if (this.x > Player.y) this.dir = Direction.West;
         }
 
         // Try to move in our current direction
@@ -112,15 +141,18 @@ public class BasicMiniboss : Enemy {
 
         // If there's an enemy blocking us, consider changing direction
         if (Global.OccupiedByEnemy(newX, newY, out _)) {
-            if (this.dir.NorthOrSouth()) {
+            if (this.dir.EastOrWest()) {
                 if      (this.x > Player.x) this.dir = Direction.North;
                 else if (this.x < Player.x) this.dir = Direction.South;
-            } else if (this.dir.EastOrWest()) {
-                if      (this.x < Player.y) this.dir = Direction.East;
-                else if (this.x > Player.y) this.dir = Direction.West;
+                else return; // Do nothing, we are blocked by something but otherwise aligned.
+            } else {
+                if      (this.y < Player.y) this.dir = Direction.East;
+                else if (this.y > Player.y) this.dir = Direction.West;
+                else return; // Do nothing, we are blocked by something but otherwise aligned.
             }
 
-            if (Global.OccupiedByEnemy(newX, newY, out _)) return;
+            (newX, newY) = this.dir.Add(this.x, this.y);
+            if (Global.OccupiedByEnemy(newX, newY, out _)) return; // Blocked by an enemy in both possible movement directions
         }
 
         this.x = newX;
