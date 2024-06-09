@@ -54,6 +54,8 @@ public static class Player {
     /// </summary>
     /// <returns>False if you drop the beat</returns>
     public static bool Move(Direction dir) {
+        previousX = x;
+        previousY = y;
         if (dir == Direction.None) return false;
 
         (var newX, var newY) = dir.Add(x, y);
@@ -63,8 +65,6 @@ public static class Player {
             return true;
         }
 
-        previousX = x;
-        previousY = y;
         x = newX;
         y = newY;
         return true;
