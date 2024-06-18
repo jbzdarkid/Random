@@ -49,61 +49,7 @@ public static class Player {
         y = y_;
     }
 
-    /// <summary>
-    /// Move the player in a specified |direction|
-    /// </summary>
-    /// <returns>False if you drop the beat</returns>
-    public static bool Move(Direction dir) {
-        previousX = x;
-        previousY = y;
-        if (dir == Direction.None) return false;
-
-        (var newX, var newY) = dir.Add(x, y);
-        if (Global.IsOob(newX, newY)) return false;
-        if (Global.OccupiedByEnemy(newX, newY, out Enemy? enemy)) {
-            enemy.OnHit(dir, weaponDamage);
-            return true;
-        }
-
-        x = newX;
-        y = newY;
-        return true;
-    }
-
     public static void Special(string v) => throw new NotImplementedException();
-
-    public static bool HandleInput(ConsoleKey key, out bool droppedTheBeat) {
-        droppedTheBeat = false;
-
-        switch (key) {
-            case ConsoleKey.E:
-                droppedTheBeat = !Move(Direction.North);
-                return true;
-            case ConsoleKey.S:
-                droppedTheBeat = !Move(Direction.West);
-                return true;
-            case ConsoleKey.D:
-                droppedTheBeat = !Move(Direction.South);
-                return true;
-            case ConsoleKey.F:
-                droppedTheBeat = !Move(Direction.East);
-                return true;
-            case ConsoleKey.Spacebar:
-                droppedTheBeat = !Move(Direction.None);
-                return true;
-            case ConsoleKey.Q:
-                Special("bomb");
-                return true;
-            case ConsoleKey.A:
-                Special("drum");
-                return true;
-            case ConsoleKey.W:
-                Special("earth");
-                return true;
-        }
-
-        return false;
-    }
 
     public static void OnHit(Direction dir, int damage) {
         // TODO.
