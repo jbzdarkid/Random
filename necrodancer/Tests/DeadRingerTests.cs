@@ -5,9 +5,11 @@ namespace DeadRingerTest;
 
 [TestClass]
 public class DeadRingerTests {
+    private Level level = Program.InitDeadRinger();
+
     [TestCleanup]
     public void Cleanup() {
-        Global.enemies.Clear();
+        this.level.enemies.Clear();
     }
 
     private static Direction C2D(char c) => c switch {
@@ -23,10 +25,8 @@ public class DeadRingerTests {
     private void SimulateAndTest(string test) {
         Debug.WriteLine($"Simulating test '{test}'");
         foreach (char c in test) {
-            Player.Move(C2D(c));
-            if (Player.x == 10) continue; // Still in the entryway, fight hasn't started yet.
-            Global.SimulateBeat();
-            if (Debugger.IsAttached) Program.DrawGrid();
+            this.level.Move(C2D(c));
+            if (Debugger.IsAttached) this.level.DrawGrid();
         }
     }
 
@@ -34,7 +34,6 @@ public class DeadRingerTests {
     public void Oblivion() {
         string test = "ENNEEWWWWNWSWNNNEEENNENENNW";
         RNG.Seed([0]);
-        Program.InitDeadRinger();
         this.SimulateAndTest(test);
     }
 }

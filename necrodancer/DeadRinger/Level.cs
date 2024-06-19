@@ -5,6 +5,8 @@ using System.Text;
 namespace DeadRinger;
 
 public class Level {
+    public static Level GlobalLevel;
+
     public readonly string name;
     public readonly int width;
     public readonly int height;
@@ -13,6 +15,7 @@ public class Level {
         this.name = name;
         this.width = width;
         this.height = height;
+        GlobalLevel = this;
     }
 
     public List<Enemy> enemies = [];
@@ -26,7 +29,7 @@ public class Level {
         return x >= this.height;
     }
 
-    public bool OccupiedByEnemy(int x, int y, [NotNullWhen(returnValue: true)] out Enemy? enemy) => OccupiedByEnemy<Enemy>(x, y, out enemy);
+    public bool OccupiedByEnemy(int x, int y, [NotNullWhen(returnValue: true)] out Enemy? enemy) => this.OccupiedByEnemy<Enemy>(x, y, out enemy);
     public bool OccupiedByEnemy<T>(int x, int y, [NotNullWhen(returnValue: true)] out T? enemy) where T : Enemy {
         enemy = this.enemies.Find(enemy => enemy.x == x && enemy.y == y) as T;
         return enemy != null;
@@ -48,15 +51,15 @@ public class Level {
         Player.previousY = Player.y;
         if (dir != Direction.None) {
             (var newX, var newY) = dir.Add(Player.x, Player.y);
-            if (this.IsOob(newX, newY)) return false;
-            if (this.OccupiedByEnemy(newX, newY, out Enemy? enemy)) {
-                enemy.OnHit(dir, Player.weaponDamage);
-                return true;
+            if (this.IsOob(newX, newY)) { } // Player does not move but actions still run
+            else if (this.OccupiedByEnemy(newX, newY, out Enemy? enemy)) enemy.OnHit(dir, Player.weaponDamage); // Player does not move because they attacked
+            else {
+                Player.x = newX;
+                Player.y = newY;
             }
+        } // Continue running logic for enemies in all cases.
 
-            Player.x = newX;
-            Player.y = newY;
-        }
+        if (this.name == "Dead Ringer" && Player.x == 10) return true; // Still in the entryway, fight hasn't started yet.
 
         foreach (var enemy in this.enemies) enemy.Update();
 

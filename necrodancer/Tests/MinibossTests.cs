@@ -5,9 +5,11 @@ namespace DeadRingerTest;
 
 [TestClass]
 public class MinibossTests {
+    private Level level = new("Miniboss Test", 9, 9);
+
     [TestCleanup]
     public void Cleanup() {
-        Global.enemies.Clear();
+        this.level.enemies.Clear();
     }
 
     private static Direction C2D(char c) => c switch {
@@ -23,11 +25,10 @@ public class MinibossTests {
     private void SimulateAndTest<T>(string test, int x, int y, char dir, int health) where T : Enemy {
         Debug.WriteLine($"Simulating test '{test}'");
         foreach (char c in test) {
-            Player.Move(C2D(c));
-            Global.SimulateBeat();
-            if (Debugger.IsAttached) Program.DrawGrid();
+            this.level.Move(C2D(c));
+            if (Debugger.IsAttached) this.level.DrawGrid();
         }
-        Enemy? enemy = Global.enemies.Find(x => x is T);
+        Enemy? enemy = this.level.enemies.Find(x => x is T);
         if (health == 0) { // Killed.
             Assert.IsNull(enemy);
         } else {
@@ -61,10 +62,8 @@ public class MinibossTests {
     [DataRow("NN.ESE",       5, 4, 'S')]
     [DataRow("NN.ENNNNW..W", 2, 3, 'W')]
     public void TestGreenDragon(string test, int x, int y, char dir, int health = 4) {
-        Global.width = 9;
-        Global.height = 9;
         Player.Init(6, 4);
-        Global.enemies.Add(new Sarcophagus(1, 4, () => new GreenDragon(2, 4)));
+        this.level.enemies.Add(new Sarcophagus(1, 4, () => new GreenDragon(2, 4)));
         this.SimulateAndTest<GreenDragon>(test, x, y, dir, health);
     }
 
@@ -79,10 +78,8 @@ public class MinibossTests {
     [DataRow("NNNNN" ,      0, 0, '?', 0)]
     [DataRow("NN.ENNNNW..", 2, 4, 'N')]
     public void TestNightmare(string test, int x, int y, char dir, int health = 3) {
-        Global.width = 9;
-        Global.height = 9;
         Player.Init(6, 4);
-        Global.enemies.Add(new Sarcophagus(1, 4, () => new Nightmare(2, 4)));
+        this.level.enemies.Add(new Sarcophagus(1, 4, () => new Nightmare(2, 4)));
         this.SimulateAndTest<Nightmare>(test, x, y, dir, health);
     }
 
@@ -122,10 +119,8 @@ public class MinibossTests {
     [DataRow("NE...WE",  3, 4, 'S')]
     [DataRow("NE....WE", 4, 4, 'S')]
     public void TestOgre(string test, int x, int y, char dir, int health = 5) {
-        Global.width = 9;
-        Global.height = 9;
         Player.Init(6, 4);
-        Global.enemies.Add(new Sarcophagus(1, 4, () => new Ogre(2, 4)));
+        this.level.enemies.Add(new Sarcophagus(1, 4, () => new Ogre(2, 4)));
 
         this.SimulateAndTest<Ogre>(test, x, y, dir, health);
     }
@@ -141,10 +136,8 @@ public class MinibossTests {
     [DataRow("S....EWW.W.",   8, 3, 'W', 2)]
     [DataRow("S....EWW..W",   7, 4, 'N', 2)]
     public void TestMinotaur(string test, int x, int y, char dir, int health = 3) {
-        Global.width = 9;
-        Global.height = 9;
         Player.Init(6, 4);
-        Global.enemies.Add(new Sarcophagus(1, 4, () => new Minotaur(2, 4)));
+        this.level.enemies.Add(new Sarcophagus(1, 4, () => new Minotaur(2, 4)));
 
         this.SimulateAndTest<Minotaur>(test, x, y, dir, health);
     }
