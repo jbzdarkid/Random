@@ -1,6 +1,4 @@
-﻿using System.Collections;
-
-namespace DeadRinger;
+﻿namespace DeadRinger;
 
 public class State {
     public int beat;
@@ -37,7 +35,7 @@ public class Solver {
             return;
         }
 
-        if (this.solution.Count >= 10) return;
+        if (this.solution.Count >= 15) return;
 
         State state = this.level.GetState();
         foreach (Direction dir in toTry) {

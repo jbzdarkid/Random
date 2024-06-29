@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System.Collections;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
 
@@ -10,11 +11,13 @@ public class Level {
     public readonly string name;
     public readonly int width;
     public readonly int height;
+    public Enemy?[,] grid;
 
     public Level(string name, int width, int height) {
         this.name = name;
         this.width = width;
         this.height = height;
+        this.grid = new Enemy[this.height, this.width];
         GlobalLevel = this;
     }
 
@@ -26,7 +29,8 @@ public class Level {
     public virtual bool IsOob(int x, int y) => y < 0 || y >= this.width || x < 0 || x >= this.height;
     public bool OccupiedByEnemy(int x, int y, [NotNullWhen(returnValue: true)] out Enemy? enemy) => this.OccupiedByEnemy<Enemy>(x, y, out enemy);
     public bool OccupiedByEnemy<T>(int x, int y, [NotNullWhen(returnValue: true)] out T? enemy) where T : Enemy {
-        enemy = this.enemies.Find(enemy => enemy.x == x && enemy.y == y) as T;
+        if (x < 0 || x >= this.height) { enemy = null; return false; } // safety check bc IsOob may be overwritten.
+        enemy = this.grid[x, y] as T;
         return enemy != null;
     }
     public bool OccupiedByPlayer(int x, int y) => x == Player.x && y == Player.y;

@@ -3,13 +3,23 @@
 namespace DeadRinger;
 
 public class Enemy {
-    public int x, y, health, delay;
+    public int x { get; private set; }
+    public int y { get; private set; }
+
+    public int health, delay;
     public Direction dir = Direction.EastWest;
     public Enemy(int x, int y, int health, int delay) {
         this.x = x;
         this.y = y;
         this.health = health;
         this.delay = delay;
+    }
+
+    public void SetPos(int x, int y) {
+        Level.GlobalLevel.grid[this.x, this.y] = null;
+        Level.GlobalLevel.grid[x, y] = this;
+        this.x = x;
+        this.y = y;
     }
 
     public Enemy Clone() => (Enemy)this.MemberwiseClone();
@@ -159,8 +169,7 @@ public class BasicMiniboss : Enemy {
             if (Level.GlobalLevel.OccupiedByEnemy(newX, newY, out _)) return; // Blocked by an enemy in both possible movement directions
         }
 
-        this.x = newX;
-        this.y = newY;
+        this.SetPos(newX, newY);
         this.delay = 1;
     }
 }
@@ -264,8 +273,7 @@ public class Ogre : Enemy {
         int newX = this.x, newY = this.y;
         DirectionExtensions.Add(this.dir, ref newX, ref newY);
         if (Level.GlobalLevel.OccupiedByEnemy(newX, newY, out _)) return; // Blocked
-        this.x = newX;
-        this.y = newY;
+        this.SetPos(newX, newY);
         this.delay = 3;
     }
 }
@@ -294,8 +302,7 @@ public class Minotaur : Enemy {
                 && !Level.GlobalLevel.OccupiedByPlayer(newX, newY)
                 && !Level.GlobalLevel.OccupiedByEnemy(newX, newY, out enemy)) {
                 // Charge is not obstructed, keep on charging
-                this.x = newX;
-                this.y = newY;
+                this.SetPos(newX, newY);
                 return;
             }
             
@@ -320,8 +327,7 @@ public class Minotaur : Enemy {
         DirectionExtensions.Add(this.dir, ref newX, ref newY);
         if (Level.GlobalLevel.OccupiedByEnemy(newX, newY, out _)) return; // Blocked
 
-        this.x = newX;
-        this.y = newY;
+        this.SetPos(newX, newY);
     }
 }
 
@@ -415,8 +421,7 @@ public class DeadRinger : Enemy {
                 return;
             }
 
-            this.x = newX;
-            this.y = newY;
+            this.SetPos(newX, newY);
             return;
         }
 
@@ -440,8 +445,7 @@ public class DeadRinger : Enemy {
             // TODO: I'm not sure exactly how Dead Ringer handles situations where the diagonal is blocked. This is fine for now.
             if (Level.GlobalLevel.OccupiedByEnemy(newX, newY, out _)) newY = this.y;
 
-            this.x = newX;
-            this.y = newY;
+            this.SetPos(newX, newY);
             this.delay = 1;
             if (this.x == this.nextBell.x - 1 && this.y == this.nextBell.y) {
                 this.delay++; // Add an extra delay to simulate the windup
@@ -478,8 +482,7 @@ public class DeadRinger : Enemy {
                 }
                 
                 if (!hitAnything) {
-                    this.x = newX;
-                    this.y = newY;
+                    this.SetPos(newX, newY);
                 }
             }
 
@@ -506,8 +509,7 @@ public class DeadRinger : Enemy {
             return;
         }
 
-        this.x = newX;
-        this.y = newY;
+        this.SetPos(newX, newY);
     }
 
     public override void OnHit(Direction dir, int damage) {
@@ -545,8 +547,6 @@ public class Bell : Enemy {
     Enemy? enemy;
 
     public Bell(int x, int y, Func<int, int, Enemy> summon) : base(x, y, 999, 0) {
-        this.x = x;
-        this.y = y;
         this.summon = summon;
     }
 
