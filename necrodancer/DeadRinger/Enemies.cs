@@ -12,6 +12,8 @@ public class Enemy {
         this.delay = delay;
     }
 
+    public Enemy Clone() => (Enemy)this.MemberwiseClone();
+
     // Most enemies share logic for movement -- they move axis-aligned (northsouth / eastwest)
     // until they line up with the player on the perpendicular axis.
     // They can change axis when blocked by an enemy or wall.
@@ -29,7 +31,8 @@ public class Enemy {
             else if (this.x < Player.x) return Direction.South;
             else Debug.Assert(false);
         } else { // Else, we've already decided a direction, only change if we're blocked
-            (var newX, var newY) = this.dir.Add(this.x, this.y);
+            int newX = this.x, newY = this.y;
+            DirectionExtensions.Add(this.dir, ref newX, ref newY);
             if (Level.GlobalLevel.OccupiedByEnemy(newX, newY, out _)) {
                 if (this.dir.EastOrWest()) {
                     if      (this.x > Player.x) return Direction.North;
@@ -61,10 +64,9 @@ public class Enemy {
         if (distanceToPlayer > range) return Direction.None;
 
         // Then iterate all the squares between here and there.
-        var i = this.x;
-        var j = this.y;
+        int i = this.x, j = this.y;
         while (true) {
-            (i, j) = dir.Add(i, j);
+            DirectionExtensions.Add(dir, ref i, ref j);
             if (Level.GlobalLevel.OccupiedByEnemy(i, j, out _)) return Direction.None;
             if (i == x && j == y) return dir;
         }
@@ -132,7 +134,8 @@ public class BasicMiniboss : Enemy {
         }
 
         // Try to move in our current direction
-        (var newX, var newY) = this.dir.Add(this.x, this.y);
+        int newX = this.x, newY = this.y;
+        DirectionExtensions.Add(this.dir, ref newX, ref newY);
         if (Level.GlobalLevel.OccupiedByPlayer(newX, newY)) {
             Player.OnHit(this.dir, this.damage);
             this.delay = 1;
@@ -151,7 +154,8 @@ public class BasicMiniboss : Enemy {
                 else return; // Do nothing, we are blocked by something but otherwise aligned.
             }
 
-            (newX, newY) = this.dir.Add(this.x, this.y);
+            newX = this.x; newY = this.y;
+            DirectionExtensions.Add(this.dir, ref newX, ref newY);
             if (Level.GlobalLevel.OccupiedByEnemy(newX, newY, out _)) return; // Blocked by an enemy in both possible movement directions
         }
 
@@ -240,7 +244,7 @@ public class Ogre : Enemy {
             int i = this.x;
             int j = this.y;
             for (int k = 0; k < 3; k++) {
-                (i, j) = this.swinging.Add(i, j);
+                DirectionExtensions.Add(this.swinging, ref i, ref j);
                 if (Level.GlobalLevel.OccupiedByEnemy(i, j, out Enemy? enemy)) enemy.OnHit(this.swinging, 5);
                 else if (Level.GlobalLevel.OccupiedByPlayer(i, j)) Player.OnHit(this.swinging, 5);
             }
@@ -257,7 +261,8 @@ public class Ogre : Enemy {
         this.dir = newDir;
         this.plannedDir = Direction.None;
 
-        (var newX, var newY) = this.dir.Add(this.x, this.y);
+        int newX = this.x, newY = this.y;
+        DirectionExtensions.Add(this.dir, ref newX, ref newY);
         if (Level.GlobalLevel.OccupiedByEnemy(newX, newY, out _)) return; // Blocked
         this.x = newX;
         this.y = newY;
@@ -282,7 +287,8 @@ public class Minotaur : Enemy {
         int newX, newY;
         if (this.charging != Direction.None) {
             this.dir = this.charging; // Just for clarity / testing purposes, charging is still the source of truth.
-            (newX, newY) = this.charging.Add(this.x, this.y);
+            newX = this.x; newY = this.y;
+            DirectionExtensions.Add(this.charging, ref newX, ref newY);
             Enemy? enemy = null;
             if (!Level.GlobalLevel.IsOob(newX, newY)
                 && !Level.GlobalLevel.OccupiedByPlayer(newX, newY)
@@ -310,7 +316,8 @@ public class Minotaur : Enemy {
         if (newDir == Direction.None) return; // We already checked and found that our current direction is blocked by an enemy.
         this.dir = newDir;
 
-        (newX, newY) = this.dir.Add(this.x, this.y);
+        newX = this.x; newY = this.y;
+        DirectionExtensions.Add(this.dir, ref newX, ref newY);
         if (Level.GlobalLevel.OccupiedByEnemy(newX, newY, out _)) return; // Blocked
 
         this.x = newX;
@@ -338,7 +345,7 @@ public class Skeleton : Enemy {
         if (this.dir == Direction.EastWest && this.y < Player.y) this.dir = Direction.East;
         if (this.dir == Direction.EastWest && this.y > Player.y) this.dir = Direction.West;
 
-        (var newX, var newY) = this.dir.Add(this.x, this.y);
+        (var newX, var newY) = DirectionExtensions.Add(this.dir, this.x, this.y);
         if (
 
     }
@@ -392,7 +399,8 @@ public class DeadRinger : Enemy {
 
         if (this.charging != Direction.None) {
             this.dir = this.charging; // Just for clarity / testing purposes, charging is still the source of truth.
-            (var newX, var newY) = this.charging.Add(this.x, this.y);
+            int newX = this.x; int newY = this.y;
+            DirectionExtensions.Add(this.charging, ref newX, ref newY);
             if (Level.GlobalLevel.IsOob(newX, newY)) {
                 this.charging = Direction.None; // Charge finished. Stun for 1 frame then we'll resume next frame.
                 this.delay = 1;
@@ -454,7 +462,8 @@ public class DeadRinger : Enemy {
         if (this.dash != Direction.None) {
             bool hitAnything = false;
             while (!hitAnything) {
-                (newX, newY) = this.dash.Add(this.x, this.y);
+                newX = this.x; newY = this.y;
+                DirectionExtensions.Add(this.dash, ref newX, ref newY);
                 if (Level.GlobalLevel.IsOob(newX, newY)) {
                     if (newX == -1 && newY == 5) { // We hit the gong, end the fight
                         Level.GlobalLevel.oldEnemies.AddRange(Level.GlobalLevel.enemies);

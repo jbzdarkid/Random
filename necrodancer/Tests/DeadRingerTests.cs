@@ -5,7 +5,7 @@ namespace DeadRingerTest;
 
 [TestClass]
 public class DeadRingerTests {
-    private Level level = Program.InitDeadRinger();
+    private Level level = new DeadRingerFight(forcedRng: 0);
 
     [TestCleanup]
     public void Cleanup() {
@@ -33,7 +33,7 @@ public class DeadRingerTests {
     [TestMethod]
     public void Oblivion() {
         string test = "ENNEEWWWWNWSWNNNEEENNENENNW";
-        RNG.Seed([0]);
         this.SimulateAndTest(test);
+        Assert.IsTrue(level.Won());
     }
 }

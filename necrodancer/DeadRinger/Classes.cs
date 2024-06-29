@@ -13,14 +13,15 @@ public enum Direction {
 }
 
 public static class DirectionExtensions {
-    public static (int, int) Add(this Direction direction, int x, int y)
-    => direction switch {
-        Direction.North => (x - 1, y),
-        Direction.South => (x + 1, y),
-        Direction.East => (x, y + 1),
-        Direction.West => (x, y - 1),
-        _ => (x, y),
-    };
+    public static void Add(Direction direction, ref int x, ref int y) {
+        switch (direction) {
+            case Direction.North: x--; return;
+            case Direction.South: x++; return;
+            case Direction.East:  y++; return;
+            case Direction.West:  y--; return;
+        }
+    }
+
     public static (int, int) Subtract(this Direction direction, int x, int y)
     => direction switch {
         Direction.North => (x + 1, y),
