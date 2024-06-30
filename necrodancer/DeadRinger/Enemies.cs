@@ -22,7 +22,7 @@ public class Enemy {
         this.y = y;
     }
 
-    public Enemy Clone() => (Enemy)this.MemberwiseClone();
+    public virtual Enemy Clone() => (Enemy)this.MemberwiseClone();
 
     // Most enemies share logic for movement -- they move axis-aligned (northsouth / eastwest)
     // until they line up with the player on the perpendicular axis.
@@ -97,6 +97,8 @@ public class BasicMiniboss : Enemy {
     public BasicMiniboss(int x, int y, int health, int damage, int delay = 1) : base(x, y, health, delay) {
         this.damage = damage;
     }
+
+    public override BasicMiniboss Clone() => new BasicMiniboss(this.x, this.y, this.health, this.damage, this.delay);
 
     public override void Update() {
         if (this.delay > 0) {
@@ -192,6 +194,15 @@ public class Ogre : Enemy {
     public Direction plannedDir = Direction.None;
     public Ogre(int x, int y, int delay = 1) : base(x, y, 5, delay) { }
 
+    public override Ogre Clone() {
+        Ogre ogre = new(this.x, this.y, this.delay);
+        ogre.health = this.health;
+        ogre.cannotSwing = this.cannotSwing;
+        ogre.swinging = this.swinging;
+        ogre.plannedDir = this.plannedDir;
+        return ogre;
+    }
+
     // Ogres will make 90 degree inside turns if the player is close to axis-aligned.
     public Direction PlanDirectionChange() {
         if (this.dir == Direction.North && this.x.Between(Player.x - 1, Player.x)) {
@@ -282,6 +293,13 @@ public class Minotaur : Enemy {
     Direction charging = Direction.None;
     public Minotaur(int x, int y, int delay = 1) : base(x, y, 3, delay) { }
 
+    public override Minotaur Clone() {
+        Minotaur minotaur = new(this.x, this.y, this.delay);
+        minotaur.health = this.health;
+        minotaur.charging = this.charging;
+        return minotaur;
+    }
+
     public override void Update() {
         if (this.delay > 0) {
             this.delay--;
@@ -363,8 +381,17 @@ public class DeadRinger : Enemy {
     public Direction charging = Direction.None;
     public Direction ringBell = Direction.None;
     public bool phase2 = false;
-    public DeadRinger(int x, int y, Bell nextBell) : base(x, y, 2, 0) {
+    public DeadRinger(int x, int y, Bell? nextBell) : base(x, y, health: 2, delay: 0) {
         this.nextBell = nextBell;
+    }
+    
+    public override DeadRinger Clone() {
+        DeadRinger deadRinger = new(this.x, this.y, this.nextBell);
+        deadRinger.health = this.health;
+        deadRinger.delay = this.delay;
+        deadRinger.charging = this.charging;
+        deadRinger.ringBell = this.ringBell;
+        return deadRinger;
     }
 
     public override void Update() {
@@ -514,7 +541,9 @@ public class DeadRinger : Enemy {
 
     public override void OnHit(Direction dir, int damage) {
         if (damage < 999) return;
-        // TODO: Phase change on inf damage
+        // Infinite damage attacks do damage DR, and trigger an immediate phase change.
+        base.OnHit(dir, 1);
+        this.phase2 = true;
     }
 }
 
@@ -548,6 +577,13 @@ public class Bell : Enemy {
 
     public Bell(int x, int y, Func<int, int, Enemy> summon) : base(x, y, 999, 0) {
         this.summon = summon;
+    }
+    
+    public override Bell Clone() {
+        Bell bell = new(this.x, this.y, this.summon);
+        bell.rungOn = this.rungOn;
+        bell.enemy = this.enemy; // !!! Hack -- this is a shallow reference to the original enemy, which can be from another state! It shouldn't matter for this, but keep an eye out for more complex child scenarios.
+        return bell;
     }
 
     public override void OnHit(Direction dir, int damage) {

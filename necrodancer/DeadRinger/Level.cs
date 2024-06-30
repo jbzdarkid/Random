@@ -1,5 +1,4 @@
-﻿using System.Collections;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
 
@@ -82,7 +81,7 @@ public class Level {
             }
         } // Continue running logic for enemies in all cases.
 
-        if (this.name == "Dead Ringer" && Player.x == 10) return true;
+        if (this.name == "Dead Ringer" && Player.x == 10) return true; // TODO: Subclass? idk
 
         foreach (var enemy in this.enemies) enemy.Update();
 
