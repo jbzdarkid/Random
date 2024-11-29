@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System.Buffers;
+using System.Diagnostics;
 
 namespace DeadRinger;
 
@@ -16,6 +17,7 @@ public class Enemy {
     }
 
     public void SetPos(int x, int y) {
+        if (x == this.x && y == this.y) return;
         Level.GlobalLevel.grid[this.x, this.y] = null;
         Level.GlobalLevel.grid[x, y] = this;
         this.x = x;
@@ -384,7 +386,7 @@ public class DeadRinger : Enemy {
     public DeadRinger(int x, int y, Bell? nextBell) : base(x, y, health: 2, delay: 0) {
         this.nextBell = nextBell;
     }
-    
+
     public override DeadRinger Clone() {
         DeadRinger deadRinger = new(this.x, this.y, this.nextBell);
         deadRinger.health = this.health;
@@ -571,9 +573,9 @@ public class Sarcophagus : Enemy {
 
 public class Bell : Enemy {
     public bool rung => this.rungOn != -1;
-    private int rungOn = -1;
-    Func<int, int, Enemy> summon;
-    Enemy? enemy;
+    public int rungOn = -1;
+    public Func<int, int, Enemy> summon;
+    public Enemy? enemy;
 
     public Bell(int x, int y, Func<int, int, Enemy> summon) : base(x, y, 999, 0) {
         this.summon = summon;
@@ -584,6 +586,13 @@ public class Bell : Enemy {
         bell.rungOn = this.rungOn;
         bell.enemy = this.enemy; // !!! Hack -- this is a shallow reference to the original enemy, which can be from another state! It shouldn't matter for this, but keep an eye out for more complex child scenarios.
         return bell;
+    }
+
+    public void CopyTo(Bell bell) {
+        bell.SetPos(this.x, this.y);
+        bell.rungOn = this.rungOn;
+        bell.summon = this.summon;
+        bell.enemy = this.enemy;
     }
 
     public override void OnHit(Direction dir, int damage) {

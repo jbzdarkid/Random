@@ -1,0 +1,3 @@
+[submodule "necrodancer/WitnessRNG"]
+	path = necrodancer/WitnessRNG
+	url = https://github.com/jbzdarkid/WitnessRNG

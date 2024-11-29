@@ -45,9 +45,8 @@ public class Level {
         state.playerY = Player.y;
         state.playerPreviousX = Player.previousX;
         state.playerPreviousY = Player.previousY;
-        foreach (Enemy enemy in this.enemies) {
-            state.enemies.Add(enemy.Clone());
-        }
+
+        state.SetEnemies(this.enemies);
         
         return state;
     }
@@ -58,10 +57,7 @@ public class Level {
         Player.y = state.playerY;
         Player.previousX = state.playerPreviousX;
         Player.previousY = state.playerPreviousY;
-        this.enemies.Clear();
-        foreach (Enemy enemy in state.enemies) {
-            this.enemies.Add(enemy.Clone());
-        }
+        state.GetEnemies(ref this.enemies);
     }
 
     public virtual bool Won() => throw new NotImplementedException();
