@@ -1,3 +1,6 @@
-[submodule "necrodancer/WitnessRNG"]
-	path = necrodancer/WitnessRNG
+[submodule "necrodancer2/WitnessRNG"]
+	path = necrodancer2/WitnessRNG
 	url = https://github.com/jbzdarkid/WitnessRNG
+[submodule "srcom/SpeedrunBot"]
+	path = srcom/SpeedrunBot
+	url = https://github.com/jbzdarkid/SpeedrunBot
