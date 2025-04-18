@@ -221,7 +221,7 @@ class PartialSolution(Thread):
     self.board |= 2 << (x*self.board_w + y)
 
   # Helper method for printBoard, used in construction of board3
-  def setPrintableBoard(board, x, y, char):
+  def setPrintableBoard(self, board, x, y, char):
     if board[x][y] == '/':
       board[x][y] = char
     elif board[x][y] == '-' and char == '|':
@@ -229,7 +229,7 @@ class PartialSolution(Thread):
     elif board[x][y] == '|' and char == '-':
       board[x][y] = '+'
 
-  def printBoard(self, simple=False, size=4):
+  def printBoard(self, simple=False, size=2):
     global pieces
     # Board2 is reconstructed from the piece placement steps
     board2 = [[-1 for _ in range(self.board_w)] for __ in range(self.board_h)]
@@ -258,33 +258,33 @@ class PartialSolution(Thread):
     for x, y in doubleIter(len(board2), len(board2[x])):
       if board2[x][y] != -1: # Piece internal
         for i, j in doubleIter(size-1, size*2-1):
-          setPrintableBoard(board3, x*size+i+1, y*size*2+j+1, ' ')
+          self.setPrintableBoard(board3, x*size+i+1, y*size*2+j+1, ' ')
         if x > 0 and board2[x][y] == board2[x-1][y]: # Piece internal row
           for j in range(1, size*2):
-            setPrintableBoard(board3, x*size, y*size*2+j, ' ')
+            self.setPrintableBoard(board3, x*size, y*size*2+j, ' ')
         if y > 0 and board2[x][y] == board2[x][y-1]: # Piece internal column
           for i in range(1, size):
-            setPrintableBoard(board3, x*size+i, y*size*2, ' ')
+            self.setPrintableBoard(board3, x*size+i, y*size*2, ' ')
         if x > 0 and y > 0 and board2[x][y] == board2[x-1][y] and board2[x][y] == board2[x][y-1]: # O piece internal
-          setPrintableBoard(board3, x*size, y*size*2, ' ')
+          self.setPrintableBoard(board3, x*size, y*size*2, ' ')
       if x == 0: # Top row
         for j in range(size*2):
-          setPrintableBoard(board3, x*size, y*size*2+j, '-')
+          self.setPrintableBoard(board3, x*size, y*size*2+j, '-')
       elif board2[x][y] != board2[x-1][y]: # Internal row
         for j in range(size*2+1):
-          setPrintableBoard(board3, x*size, y*size*2+j, '-')
+          self.setPrintableBoard(board3, x*size, y*size*2+j, '-')
       if x == self.board_h-1: # Bottom row
         for j in range(size*2):
-          setPrintableBoard(board3, (x+1)*size, y*size*2+j, '-')
+          self.setPrintableBoard(board3, (x+1)*size, y*size*2+j, '-')
       if y == 0: # Left column
         for i in range(size):
-          setPrintableBoard(board3, x*size+i, y*size*2, '|')
+          self.setPrintableBoard(board3, x*size+i, y*size*2, '|')
       elif board2[x][y] != board2[x][y-1]: # Internal column
         for i in range(size+1):
-          setPrintableBoard(board3, x*size+i, y*size*2, '|')
+          self.setPrintableBoard(board3, x*size+i, y*size*2, '|')
       if y == self.board_w-1: # Right column
         for i in range(size):
-          setPrintableBoard(board3, x*size+i, (y+1)*size*2, '|')
+          self.setPrintableBoard(board3, x*size+i, (y+1)*size*2, '|')
 
     print(self.cost)
     for line in board3:
@@ -523,7 +523,7 @@ if __name__ == "__main__":
     # 'B':          ['ILTTZ',          5, 4], # 1
     # 'C':          ['JJLTTZ',         6, 4], # 0
     # 'A star':     ['JLSSTTTTZZ',     5, 8], # 1
-    'B star':     ['IIJLLOTTTT',     5, 8], # 1
+    # 'B star':     ['IIJLLOTTTT',     5, 8], # 1
     # 'C star':     ['IIJLOOSTTZ',     5, 8], # 1
     # 'Floor 1':    ['LLZZ',           4, 4], # 1
     # 'Floor 2':    ['LLLLOTTTT',      6, 6], # 2
@@ -668,7 +668,11 @@ if __name__ == "__main__":
     # 'Hardest 8x4': ['IJLOSSSZ', 8, 4],
     # 'Hardest Nx6': [''],
     # 'Hardest Nx8': [''],
+    
+    'ITB door 1': ['IJLZ', 4, 4],
+    'ITB door 2': ['JJLLSZ', 4, 6],
+    'ITB door 3': ['ILLOTTZZ', 4, 8],
   }
-  solve(challenges, 16, 1)
+  solve(challenges, 16, 'ALL')
   if DEBUG:
     print(checks)
