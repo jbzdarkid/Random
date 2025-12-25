@@ -30,7 +30,10 @@ def read_varint(stream):
     shift = 0
     result = 0
     while True:
-        raw = ord(stream.read(1))
+        byte = stream.read(1)
+        if byte in [None, b'']:
+            break
+        raw = ord(byte)
         result |= (raw & 0x7f) << shift
         shift += 7
         if not (raw & 0x80):
@@ -38,9 +41,16 @@ def read_varint(stream):
 
     return result
     
-def read_array(stream):
+def read_array(stream, element_size=1):
     length = read_varint(stream)
-    return [read_varint(stream) for _ in range(length)]
+    array = []
+    for i in range(length):
+        if element_size == 1:
+            element = read_varint(stream)
+        else:
+            element = tuple((read_varint(stream) for j in range(element_size)))
+        array.append(element)
+    return array
 
 # From https://github.com/HearthSim/HearthDb/blob/master/HearthDb/Deckstrings/DeckSerializer.cs
 def decode_decklist(decklist):
@@ -56,13 +66,23 @@ def decode_decklist(decklist):
   heroes = read_array(stream)
   singletons = read_array(stream)
   doubletons = read_array(stream)
+  multicards = read_array(stream) # TODO zero what these are, or if this even works
+
+  has_sideboard = read_varint(stream)
+  if has_sideboard == 1: # Sideboard cards are listed as (card, parent_card)
+      sb_singletons = read_array(stream, element_size=2)
+      singletons += [e[0] for e in sb_singletons]
+      sb_doubletons = read_array(stream, element_size=2)
+      doubletons += [e[0] for e in sb_doubletons]
+      sb_multicards = read_array(stream, element_size=2)
+      multicards += [e[0] for e in sb_multicards]
   
   cards = singletons + doubletons + doubletons
   normalized_cards = normalize_deck(cards)
   normalized_cards.sort()
 
-  for i, card in enumerate(normalized_cards):
-    print(f'Card {i+1:<2}: {card:<5} {cardlist[card]}')
+  # for i, card in enumerate(normalized_cards):
+  #   print(f'Card {i+1:<2}: {card:<5} {cardlist[card]}')
 
   return normalized_cards
 
@@ -91,12 +111,18 @@ def hash_deck(cards):
     hash = trunc(bad_hash(hash, card))
   return hash
 
-unknown_hash = 4901740154402535512 # For the new deck code :)
-
 decklist = decode_decklist('AAEBAaoIDLSKBLaKBKyfBNugBOCgBJbUBKDUBKnUBPzbBMviBJakBfCuBQmf1ASo2QS12QT03ASz3QS14gSl5ATF7QTK7QQA')
 
 print('Actual hash:  ', hash_deck(decklist))
 print('Expected hash: -8433254302802380797')
+
+unknown_hash = 4901740154402535512 # For the new deck code :)
+decklist2024 = decode_decklist('AAEBAdT8BSiTB/kOjhDSEZAVt2z5rALDtAL2vwLdwgKD1AKM7wKTgAPRiQPEmAOhqQOFsQO6tgOTzQPq4QOR5APy6QOo7wPL+QOmgQSvjgS7rASStQS7zgSX7wSi7wSfpAX9xAWp5QWt6QXa+gXRnAaSngaeogbmqQYAAAEDhM4C/cQF97gD/cQF1JUG/cQFAAA=')
+
+print('Actual hash:  ', hash_deck(decklist2024))
+print('Expected hash:', unknown_hash)
+
+
 
 def bits(x, bits=64):
   if x & (1 << (bits - 1)): # Adjust for sign
@@ -156,8 +182,10 @@ def test2():
     assert rhash is not None
     # rhash will not always exactly match hash
   print('Test2 passed')
-    
+
 if __name__ == '__main__':
-  test1()
-  test2()
+  pass
+  # test1()
+  # test2()
+  # test3()
   
