@@ -1,6 +1,7 @@
 local Ambush = require "necro.game.character.Ambush"
 local Currency = require "necro.game.item.Currency"
 local Descent = require "necro.game.character.Descent"
+local Entities = require "system.game.Entities"
 local Event = require "necro.event.Event"
 local Flyaway = require "necro.game.system.Flyaway"
 local Health = require "necro.game.character.Health"
@@ -9,7 +10,10 @@ local Object = require "necro.game.object.Object"
 local Player = require "necro.game.character.Player"
 local Tile = require "necro.game.tile.Tile"
 
--- TODO: What about boxes/items we push down a trapdoor? Are those saved (probably not)?
+-- TODO: Gold/items from things we push down a trapdoor are not saved. I don't know where they live.
+-- TODO: Maintain the beat count (e.g. multiplier)
+-- TODO: Maintain spell status
+-- TODO: Maintain zone (not just floor)
 
 local youDied = false -- Tracks if we need to reapply the saved level on restart.
 
@@ -18,27 +22,24 @@ local savedHealth = nil
 local savedFloor = nil
 local savedGold = nil
 Event.levelLoad.add("captureLevelState", {order="entities"}, function(evt)
-  print("<18>", evt)
-
   -- Debugging hacks.
-  if evt.zone == 1 and evt.floor == 1 then
-    Object.spawn("MiscPotion", 1, 0)
-    Object.spawn("Bomb3", 0, 1)
-  end
+  -- if evt.zone == 1 and evt.floor == 1 then
+  --   Object.spawn("MiscPotion", 1, 0)
+  --   Object.spawn("Bomb3", 0, 1)
+  -- end
   
-  local player = Player.getPlayerEntity(1) -- Should use Player.getPlayerEntities() in the future
+  local player = Player.getPlayerEntity(1) -- Should I use Player.getPlayerEntities()?
   if youDied then
     print("Restarting level " .. evt.zone .. "-" .. evt.floor .. " after dying")
 
-    Inventory.clear(player)
-    for item, quantity in pairs(savedItems) do
-      local granted = Inventory.grant(item, player)
-      if quantity > 1 then
-        granted.itemStack.quantity = quantity
+    if #savedItems > 0 then
+      Inventory.clear(player)
+      for item, quantity in pairs(savedItems) do
+        local granted = Inventory.grant(item, player)
+        if quantity > 1 then
+          granted.itemStack.quantity = quantity
+        end
       end
-      -- for i = 0, quantity do
-      --   Inventory.grant(item, player)
-      -- end
     end
 
     local currentHealth = getHealth(player)
@@ -49,7 +50,7 @@ Event.levelLoad.add("captureLevelState", {order="entities"}, function(evt)
 
     youDied = false -- Reset the flag so we can continue to the next level... if we don't die.
   else
-    print("Reached new level " .. evt.zone .. "-" .. evt.floor)
+    print("Reached new level " .. evt.zone .. "-" .. evt.floor .. ", making new checkpoint")
 
     savedItems = {}
     for i, item in ipairs(Inventory.getItems(player)) do
@@ -73,8 +74,12 @@ Event.objectTakeDamage.add("checkDeath", {order="death", sequence=-1, filter="he
     print("Player was killed by " .. evt.attacker.name)
     evt.suppressed = true
     evt.damage = 0
-    showPopup(evt.victim, "! YOU DIED !") -- TODO: Not super visible. A menu would be better.
+    showPopup(evt.victim, "! YOU DIED !") -- TODO: A menu? So we can choose... something else?
     if Ambush.isActive() then
+      -- If we're replaying an ambush, make sure we don't carry the existing miniboss.
+      for entity in Entities.entitiesWithComponents({"ambusher"}) do
+        entity.ambusher.pending = entity.ambusher.active
+      end
       Descent.perform(evt.victim, Descent.Type.TRAPDOOR)
     else
       Descent.perform(evt.victim, Descent.Type.STAIRS)
@@ -128,5 +133,7 @@ function showPopup(entity, text)
     entity = entity,
     text = text,
     delay = 0,
+    offsetY = -20,
+    size = 10,
   })
 end
