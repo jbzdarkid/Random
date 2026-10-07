@@ -15,9 +15,14 @@ local Object = require "necro.game.object.Object"
 local ObjectEvents = require "necro.game.object.ObjectEvents"
 local Player = require "necro.game.character.Player"
 local RunState = require "necro.game.system.RunState"
+local Utilities = require "system.utils.Utilities"
+
+-- Docs are available via https://vortexbuffer.com/synchrony/docs/search/search_index.json
+-- The game's Lua is compiled and not readable; don't bother.
 
 -- TODO: Pause menu entry to retry level (in case you can't die?)
--- TODO: Clearing an arena then dying doesn't cause the arena to reappear on replay.
+-- TODO: Blood shop teleports are inconsistent.
+-- TODO: Skeleton closets/bat closets are not spawning consistently.
 
 local youDied = false -- Tracks if we need to reapply the saved level on restart.
 local spawnTrapdoorItems = false -- Tracks if we need to spawn items dropped through a trapdoor on restart.
@@ -32,14 +37,14 @@ Event.levelLoad.add("captureLevelState", {order="entities"}, function(evt)
     -- Object.spawn("MiscHeartContainer", -1, 0)
     -- Object.spawn("FamiliarShopkeeper", 1, 0)
     -- Object.spawn("SpellShield", 1, 0)
-    Object.spawn("Bomb3", 0, 1)
+    -- Object.spawn("Bomb3", 0, 1)
 
     -- Object.spawn("Crate", -1, 0)
     -- Object.spawn("Crate2", -1, 0)
     -- Object.spawn("Crate3", -1, 0)
     -- Object.spawn("Crate5", -1, 0)
     
-    Object.spawn("Trapdoor", -2, 1)
+    Object.spawn("Trapdoor", -2, 0)
   end
   
   if youDied then
@@ -53,6 +58,10 @@ Event.levelLoad.add("captureLevelState", {order="entities"}, function(evt)
   end
 end)
 
+Event.objectSpawn.add("captureRNG", {order="random", sequence=1, filter="random"}, function(evt)
+  print("<62>", evt.entity.name, evt.entity.random)
+end)
+
 Event.objectDescentArrive.add("spawnTrapdoorItems", {order="damage", sequence=1, filter="controllable"}, function(evt)
   loadTrapdoorItems(savedState)
 end)
@@ -61,6 +70,18 @@ Event.levelComplete.add("replayLevel", {order="nextLevel", sequence=-1}, functio
   if youDied and savedState ~= nil then
     print("Prevented level transition because you died")
     evt.targetLevel = savedState.targetLevel
+  end
+end)
+
+Event.gameStateLevel.add("captureAmbushers", {order="createAmbush", sequence=1}, function(evt)
+  if savedState ~= nil and savedState.ambushers ~= nil then
+    return -- Keep the first arrival's ambushers across replays.
+  end
+  savedState.ambushers = {}
+  for entity in Entities.entitiesWithComponents({"ambusher"}) do
+    if entity.ambusher.active then
+      table.insert(savedState.ambushers, entity.name)
+    end
   end
 end)
 
@@ -74,10 +95,14 @@ Event.objectTakeDamage.add("checkDeath", {order="death", sequence=-1, filter="he
   evt.suppressed = true
   evt.damage = 0
   
-  if Ambush.isActive() then
-    -- If we're replaying an ambush, make sure we don't carry the existing miniboss(es).
+  if #savedState.ambushers > 0 then
+    -- When you drop down a trapdoor, the game determines if it should spawn an ambush based on the live minibosses.
+    -- To get the same ambush, we need to clear the current miniboss, and spawn the one from the saved ambush.
     for entity in Entities.entitiesWithComponents({"ambusher"}) do
-      entity.ambusher.pending = entity.ambusher.active
+      entity.ambusher.pending = false
+    end
+    for i, name in ipairs(savedState.ambushers) do
+      Object.spawn(name, -100, -100, {ambusher = {pending = true}})
     end
     Descent.perform(evt.victim, Descent.Type.TRAPDOOR)
   else
@@ -138,17 +163,7 @@ function saveState()
   state.combo = player.grooveChain.killCount
   
   -- Per-run globals (e.g. "have you killed freddy")
-  state.runState = {}
-  for key, value in pairs(RunState.getState()) do
-    if type(value) == "table" then
-      state.runState[key] = {}
-      for subKey, subValue in pairs(value) do
-        state.runState[key][subKey] = subValue
-      end
-    else
-      state.runState[key] = value
-    end
-  end
+  state.runState = Utilities.deepCopy(RunState.getState())
 
   -- Item spawns depend on what you've already seen
   state.seenItems = {}
@@ -159,9 +174,6 @@ function saveState()
   state.trapdoorItems = {}
   for entity in Entities.entitiesWithComponents({"descent"}) do
     if entity.descent.active and string.sub(entity.name, 1, 5) == "Crate" then
-      -- TODO: I think Crate3 needs some special handling.
-      -- And probably Crate4.
-      -- sigh.
       local item = {
         name = entity.name,
         health = entity.health.health,
@@ -222,13 +234,15 @@ function loadState(state)
   Currency.set(player, Currency.Type.GOLD, savedState.gold)
 
   GrooveChain.drop(player, GrooveChain.Type.DAMAGE)
-  for i = 1, state.combo do
-    GrooveChain.increase(player)
+  if state.combo > 0 then
+    for i = 1, state.combo do
+      GrooveChain.increase(player)
+    end
   end
 
   RunState.reset({player})
   for key, value in pairs(state.runState) do
-    RunState.set(key, value)
+    RunState.set(key, Utilities.deepCopy(value))
   end
 
   -- getSeenCounts returns a reference we can modify
@@ -244,7 +258,7 @@ function loadState(state)
     end
   end
   
-  -- The trapdoor items are deferred until cadence has landed, otherwise they won't spawn properly.
+  -- The trapdoor items are deferred until the player has landed, otherwise they can overlap.
   spawnTrapdoorItems = true
 end
 
