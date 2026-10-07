@@ -21,11 +21,9 @@ local Utilities = require "system.utils.Utilities"
 -- The game's Lua is compiled and not readable; don't bother.
 
 -- TODO: Pause menu entry to retry level (in case you can't die?)
--- TODO: Blood shop teleports are inconsistent.
 -- TODO: Skeleton closets/bat closets are not spawning consistently.
 
 local youDied = false -- Tracks if we need to reapply the saved level on restart.
-local spawnTrapdoorItems = false -- Tracks if we need to spawn items dropped through a trapdoor on restart.
 
 local savedState = nil
 Event.levelLoad.add("captureLevelState", {order="entities"}, function(evt)
@@ -50,20 +48,34 @@ Event.levelLoad.add("captureLevelState", {order="entities"}, function(evt)
   if youDied then
     print("Restarting level " .. evt.zone .. "-" .. evt.floor .. " after dying")
     loadState(savedState)
-    youDied = false -- Reset the flag so we can continue to the next level
+    savedState.randomEntityIndex = 0
   else
     print("Reached new level " .. evt.zone .. "-" .. evt.floor .. ", making new checkpoint")
     savedState = saveState()
+    savedState.randomEntities = {}
     savedState.targetLevel = CurrentLevel.getNumber()
   end
 end)
 
 Event.objectSpawn.add("captureRNG", {order="random", sequence=1, filter="random"}, function(evt)
-  print("<62>", evt.entity.name, evt.entity.random)
+  if youDied then
+    local seed = savedState.randomEntities[savedState.randomEntityIndex]
+    savedState.randomEntityIndex = savedState.randomEntityIndex + 1
+    evt.entity.random = seed.rng
+  elseif savedState == nil then
+    -- not actually doing a run
+  else
+    table.insert(savedState.randomEntities, {name=evt.entity.name, rng=evt.entity.random})
+  end
 end)
 
 Event.objectDescentArrive.add("spawnTrapdoorItems", {order="damage", sequence=1, filter="controllable"}, function(evt)
-  loadTrapdoorItems(savedState)
+  if youDied then
+    loadTrapdoorItems(savedState)
+  end
+
+  -- This is the last handler (for now) so it's where we clear this flag.
+  youDied = false
 end)
 
 Event.levelComplete.add("replayLevel", {order="nextLevel", sequence=-1}, function(evt)
@@ -74,7 +86,9 @@ Event.levelComplete.add("replayLevel", {order="nextLevel", sequence=-1}, functio
 end)
 
 Event.gameStateLevel.add("captureAmbushers", {order="createAmbush", sequence=1}, function(evt)
-  if savedState ~= nil and savedState.ambushers ~= nil then
+  if savedState == nil then
+    return -- Invalid state
+  elseif savedState.ambushers ~= nil then
     return -- Keep the first arrival's ambushers across replays.
   end
   savedState.ambushers = {}
@@ -257,16 +271,10 @@ function loadState(state)
       Object.delete(entity)
     end
   end
-  
-  -- The trapdoor items are deferred until the player has landed, otherwise they can overlap.
-  spawnTrapdoorItems = true
 end
 
+-- The trapdoor items are deferred until the player has landed, otherwise they can overlap.
 function loadTrapdoorItems(state)
-  if not spawnTrapdoorItems then
-    return
-  end
-
   for i, item in pairs(state.trapdoorItems) do
     local crate = Object.spawn(item.name, item.x, item.y, {
       health = {health = item.health, maxHealth = item.maxHealth},
