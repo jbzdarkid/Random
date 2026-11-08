@@ -80,45 +80,51 @@ def flatten(data, path=None):
     sys.exit()
 
 
-def search(data, text, results):
-  found = False
+def search(data, text):
   if isinstance(data, list):
     for i, entry in enumerate(data):
-      if search(entry, text, results):
-        results[-1] = [i] + results[-1]
-        found = True
+      for result in search(entry, text):
+        yield [i] + result
 
   elif isinstance(data, dict):
+    results = []
     for k, v in data.items():
-      if search(v, text, results):
-        results[-1] = [k] + results[-1]
-        found = True
+      for result in search(v, text):
+        yield [k] + result
 
   else:
     if text in str(data):
-      results.append([str(data)])
-      found = True
-
-  return found
+      yield [str(data)]
 
 
 def extract_dialog():
   with Path('extract/Data/DialogueData.json').open('r', encoding='utf-8') as f:
     raw_data = load(f)
 
-    # search(raw_data, "have to find places for it", results)
-    # ['Exports', 0, 'Table', 'Data', 147, 'Value', 0, 'Value', 0, 'Value', 0, 'Value', 0, 'Value', 2, 'CultureInvariantString']
-    # I just...I hate having <Chaos>STUFF</>. You know? You have to find places for it, move it around...
-
-    results = []
-    search(raw_data, "<Emphasis>", results)
+    results = list(search(raw_data, 'You received'))
+    deduped = []
     for result in results:
-      # text = results[-1]
-      text = result.pop(-1)
-      print(result)
-      print(text)
-      print()
-    raise
+      node = raw_data
+      for r in result[:5]:
+        node = node[r]
+      name = node['Name']
+
+      node = raw_data
+      for r in result[:-5]:
+        node = node[r]
+
+      if not any((node == d[1] for d in deduped)):
+        deduped.append((name, node))
+
+    deduped.sort(key=lambda k: k[0])
+
+    for name, node in deduped:
+      print(f'\n{name}')
+      for dialog in node:
+        speaker = dialog['Value'][1]['CultureInvariantString']
+        text = dialog['Value'][2]['CultureInvariantString']
+        if speaker:
+          print(f'{speaker}: {text}')
 
     dialog = {}
     for entry in raw_data['Exports'][0]['Table']['Data']:
